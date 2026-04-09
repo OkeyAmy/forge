@@ -1,7 +1,10 @@
 agent:
-  model_name: models/gemini-2.0-flash-001
-  base_url: https://generativelanguage.googleapis.com/v1beta/openai
-  api_key: AIzaSyAiKSrhwbpkOiLc5P71F7kn_sTVCAp3yxE
+  # Add your model name (e.g. models/gemini-2.0-flash-001).
+  model_name: "<add your model name>"
+  # Add your OpenAI-compatible API base URL.
+  base_url: "<add your base url>"
+  # Add your API key. Do not commit real keys; use env vars or a local override.
+  api_key: "<add your api key>"
   max_steps: 25
   max_requeries: 3
   parser_type: thought_action
