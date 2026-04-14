@@ -1,0 +1,10 @@
+target/
+.env
+*.jsonl
+*.log
+Dockerfile.sandbox
+Dockerfile.release
+landing/
+trajectories/
+.remember/
+.git/
