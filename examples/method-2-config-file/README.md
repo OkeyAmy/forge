@@ -1,32 +1,51 @@
-# Method 2 — YAML config file
+# Method 2 — env vars vs YAML config (same image, your choice)
 
-More control: define the model, sandbox, system prompt, and issue in a single YAML file.
-Good for teams who want reproducible, version-controlled runs.
+Shows that YAML is **completely optional**. The default run uses only `.env` — no YAML file needed.
+YAML is available as a power-user option when you want to pin prompts or max steps in a file.
 
 **Issue being fixed:** [#28 — Add formatTokenAmount()](https://github.com/OkeyAmy/Axioschat-Onboard/issues/28)
 
-## Setup
+---
+
+## Default: just .env (no YAML)
 
 ```bash
-cp ../. env.example .env
-# Edit .env: set FORGE_API_KEY, GITHUB_TOKEN, DOCKER_GID
+cp ../.env.example .env
+# Set FORGE_API_KEY, GITHUB_TOKEN, DOCKER_GID in .env
 
 docker compose run --rm forge
 ```
 
-## Or run with the binary directly
+That's it. Forge reads `FORGE_REPO` and `FORGE_ISSUE` from `.env` and runs.
+
+---
+
+## Optional: YAML config (advanced)
+
+Use this when you want to version-control the exact prompts, step limit, or parser type.
 
 ```bash
-# If you have Forge built locally:
-set -a && source .env && set +a
-./../../target/release/forge run --config forge-issue28.yaml
+docker compose run --rm forge-yaml
 ```
 
-## Key difference from Method 1
+The YAML file (`forge-issue28.yaml`) is mounted into the container at runtime —
+the image itself does not change.
 
-The YAML config lets you:
-- Pin a specific model version
-- Customise the system + instance prompt
-- Set `max_steps` per run
-- Choose `parser_type` (thought_action / action_only / function_calling)
-- Commit the config file so every run is reproducible
+**YAML gives you control over:**
+- `max_steps` — cap how long the agent runs
+- `parser_type` — `thought_action` / `action_only` / `function_calling`
+- `system_template` — the agent's persona and instructions
+- `instance_template` — how the problem statement is presented
+
+**Everything else works identically.** The YAML is just a structured `.env` with extra fields.
+
+---
+
+## The key point
+
+```
+docker compose run --rm forge          ← env vars only, no YAML
+docker compose run --rm forge-yaml     ← same image + optional YAML on top
+```
+
+Both produce the same output format. YAML adds control, not complexity for basic use.
