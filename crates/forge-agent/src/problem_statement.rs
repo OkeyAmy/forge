@@ -239,7 +239,9 @@ impl ProblemStatement for GithubIssueProblemStatement {
             .header("User-Agent", "Forge");
 
         if let Ok(token) = std::env::var("GITHUB_TOKEN") {
-            req = req.header("Authorization", format!("Bearer {}", token));
+            if !token.is_empty() {
+                req = req.header("Authorization", format!("Bearer {}", token));
+            }
         }
 
         let response = req.send().await.map_err(|e| ForgeError::Http(e.to_string()))?;
