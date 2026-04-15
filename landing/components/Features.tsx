@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Cpu, RefreshCw, FileText, Zap, Cloud } from "lucide-react";
+import { Box, Cpu, RefreshCw, FileText, Zap, GitBranch } from "lucide-react";
 import { useInView } from "@/hooks/useInView";
 
 const FEATURES = [
@@ -30,9 +30,9 @@ const FEATURES = [
     description: "Drop-in action plugin for ElizaOS AI agents.",
   },
   {
-    icon: Cloud,
-    title: "Nosana Deployment",
-    description: "Deploy to decentralized GPU compute with a single JSON job definition.",
+    icon: GitBranch,
+    title: "Auto-fix on Label",
+    description: "Label any issue 'forge' — Forge picks it up, fixes it, and pushes branch forge/issue-{N} automatically. No commands to run.",
   },
 ];
 
@@ -51,7 +51,7 @@ export function Features() {
             does
           </h2>
           <p className="mt-4 text-muted max-w-xl mx-auto">
-            A complete autonomous engineering pipeline, from issue to patch.
+            A complete autonomous engineering pipeline, from issue to branch.
           </p>
         </div>
 

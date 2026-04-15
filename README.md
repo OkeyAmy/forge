@@ -67,51 +67,55 @@ docker compose run --rm forge run --repo owner/repo --issue 12
 
 Forge will clone the repo, work autonomously, and print a patch when done.
 
-### 5. Run continuously (watch mode)
+### 5. Always-on watch mode
 
-Add the watch target repo and label to `.env`:
+Set it up once — then just label issues on GitHub and Forge handles the rest.
+
+**Add to `.env`:**
 
 ```dotenv
 FORGE_WATCH_REPO=owner/repo
-FORGE_WATCH_LABEL=forge        # Forge picks up issues that carry this label
+FORGE_WATCH_LABEL=forge        # label to watch for
 FORGE_WATCH_INTERVAL=60        # seconds between polls
+GITHUB_TOKEN=ghp_...           # required to push the fix branch back
 ```
 
-Then start the watch service:
+**Start in the background:**
 
 ```bash
-docker compose up watch
+docker compose up watch -d
 ```
 
-Forge polls the repo every 60 seconds. Any issue you label `forge` is picked up and fixed automatically. The service restarts itself if it ever crashes.
+**That's it.** Go to GitHub, open any issue in your repo, and add the label **`forge`**. Within 60 seconds Forge picks it up, fixes it, and pushes the result to a branch named `forge/issue-{N}`. Review the branch and merge when you're happy.
 
-Stop it with `Ctrl+C` or `docker compose down`.
+- Already-processed issues are tracked in `trajectories/watch_state.json` — Forge never double-processes the same issue.
+- The service has `restart: unless-stopped` — it survives crashes and Docker restarts automatically.
+- Stop it any time with `docker compose down`.
 
 ---
 
 ## How Forge works
 
 ```
-You: label an issue "forge"
-        │
-        ▼
-┌─────────────────────────────────────┐
-│  Forge                              │
-│  1. Fetches issue title + body      │
-│  2. Starts isolated Docker sandbox  │
-│  3. Clones the repository           │
-│  4. Autonomous agent loop:          │
-│     — queries the model             │
-│     — executes bash commands        │
-│     — observes results              │
-│     — repeats until done            │
-│  5. Runs `submit` → git diff patch  │
-│  6. Tears down sandbox              │
-│  7. Saves trajectory file           │
-└─────────────────────────────────────┘
-        │
-        ▼
-  Clean git diff — ready to review and merge
+GitHub issue  ──►  add label "forge"
+                          │
+                    Forge detects it
+                    (within 60 s)
+                          │
+               ┌──────────────────────┐
+               │  Docker sandbox      │
+               │  1. Clone repo       │
+               │  2. Agent loop       │
+               │     think → act      │
+               │     → observe        │
+               │  3. submit           │
+               │     git diff patch   │
+               └──────────────────────┘
+                          │
+                    Push branch
+                    forge/issue-{N}
+                          │
+                   You review & merge
 ```
 
 ---
@@ -166,7 +170,8 @@ forge run --problem-text "Add rate-limiting to the /api/login endpoint"
 
 ### `forge watch`
 
-Watch a repo and automatically fix labelled issues.
+Poll a repo and automatically fix every issue that carries a given label.
+When `GITHUB_TOKEN` is set, the fix is pushed to branch `forge/issue-{N}` automatically.
 
 ```bash
 forge watch --repo owner/repo --label forge --interval 60
@@ -182,6 +187,8 @@ forge watch --repo owner/repo --label forge --interval 60
 | `--api-key` | `FORGE_API_KEY` | — | API key |
 | `--image` | `FORGE_SANDBOX_IMAGE` | `forge-sandbox:latest` | Sandbox image |
 | `--output-dir` | — | `trajectories` | Trajectory output dir |
+
+> **Branch push:** set `GITHUB_TOKEN` in `.env` and every completed fix is pushed to `forge/issue-{N}` on GitHub automatically.
 
 ### `forge quick-stats`
 
@@ -206,7 +213,7 @@ forge quick-stats /path/to/trajs
 | `FORGE_WATCH_REPO` | For watch | Repo to monitor |
 | `FORGE_WATCH_LABEL` | No | Label to watch (default: `forge`) |
 | `FORGE_WATCH_INTERVAL` | No | Poll interval in seconds (default: `60`) |
-| `GITHUB_TOKEN` | No | PAT — raises rate limit; required for private repos |
+| `GITHUB_TOKEN` | For branch push | PAT — required to push fix branches; also raises API rate limit and enables private repos |
 | `RUST_LOG` | No | Log filter — e.g. `forge=debug` (default: `forge=warn`) |
 | `DOCKER_GID` | No | Docker group GID on host (docker-compose socket mount) |
 

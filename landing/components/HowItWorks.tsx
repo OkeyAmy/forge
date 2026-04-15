@@ -12,7 +12,7 @@ const STEPS = [
   "Execute bash commands autonomously",
   "Run submit to capture the git diff",
   "Save the full trajectory to a .traj file",
-  "Push a branch and open a pull request automatically",
+  "Push branch forge/issue-{N} — review and merge when ready",
 ];
 
 function TerminalAnimation() {

@@ -39,6 +39,6 @@ export const TERMINAL_LINES: TerminalLine[] = [
   { type: "output", text: "+  return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);" },
   { type: "output", text: "+}" },
   { type: "blank",  text: "" },
-  { type: "output", text: "Creating pull request..." },
-  { type: "output", text: "Pull request: https://github.com/owner/repo/pull/43" },
+  { type: "output", text: "Pushing fix to branch..." },
+  { type: "output", text: "Branch pushed: forge/issue-42" },
 ];
