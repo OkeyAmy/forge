@@ -33,6 +33,9 @@ struct GitHubIssue {
     title: String,
     html_url: String,
     labels: Vec<GitHubLabel>,
+    /// Present on pull requests — GitHub's "issues" API returns PRs too; Forge only wants real issues.
+    #[serde(default)]
+    pull_request: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize)]
@@ -94,6 +97,7 @@ pub async fn handler(
 
     let issues: Vec<IssueItem> = raw
         .into_iter()
+        .filter(|i| i.pull_request.is_none())
         .map(|i| IssueItem {
             number: i.number,
             title: i.title,

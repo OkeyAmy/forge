@@ -54,3 +54,9 @@ Thumbs.db
 
 .remember/
 testsprint.md
+examples/trajectories
+
+# TestSprite local/runtime artifacts
+testsprite_tests/.venv/
+testsprite_tests/logs/
+testsprite_tests/tmp/

@@ -1,6 +1,7 @@
 mod routes;
 
-use axum::{Router, routing::{get, post}};
+use axum::{Router, routing::{delete, get, post}};
+use routes::watch::new_watch_state;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
@@ -14,11 +15,27 @@ async fn main() {
         )
         .init();
 
+    let watch_state = new_watch_state();
+
     let app = Router::new()
+        // health
         .route("/health", get(routes::health::handler))
-        .route("/api/run", post(routes::run::handler))
+        // single run
+        .route("/api/run", post(routes::run::run_handler))
+        // batch run
+        .route("/api/run/batch", post(routes::run::batch_handler))
+        // github issues
         .route("/api/issues", get(routes::issues::handler))
+        // trajectory files
+        .route("/api/trajectories", get(routes::trajectories::list_handler))
+        .route("/api/trajectories/{name}", get(routes::trajectories::get_handler))
+        // trajectory stats
         .route("/api/stats", get(routes::stats::handler))
+        // watch mode
+        .route("/api/watch", post(routes::watch::start_handler))
+        .route("/api/watch", get(routes::watch::status_handler))
+        .route("/api/watch", delete(routes::watch::stop_handler))
+        .with_state(watch_state)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http());
 

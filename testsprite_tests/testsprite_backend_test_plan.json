@@ -1,0 +1,42 @@
+[
+  {
+    "id": "TC001",
+    "title": "post api run single forge agent run",
+    "description": "Test POST /api/run endpoint by submitting a valid request with github_url and output_dir, verify response includes exit_status submitted, has_submission true, submission_preview string, steps count, model_stats with total_cost, and trajectory_file path. Also test error response 400 when required problem source fields are missing."
+  },
+  {
+    "id": "TC002",
+    "title": "post api run batch parallel agent runs",
+    "description": "Test POST /api/run/batch endpoint with multiple items including github_url, repo+issue, and problem_text, verify aggregated success and failure counts and per-item results. Also test 400 error response when request body is malformed or items array is missing."
+  },
+  {
+    "id": "TC003",
+    "title": "post get delete api watch background github label watcher",
+    "description": "Test POST /api/watch to start a watcher with repo, label, interval, model, api_key, and output_dir, verify running status and returned repo and label. Test GET /api/watch to retrieve current watcher status. Test DELETE /api/watch to stop watcher and verify stopped status. Also test 409 conflict when starting a watcher while one is already running."
+  },
+  {
+    "id": "TC004",
+    "title": "get api trajectories list trajectory files with metadata",
+    "description": "Test GET /api/trajectories with valid directory query parameter, verify response includes directory name, count of .traj files, and array of trajectories with name, exit_status, has_submission, steps, and model_stats. Also test 404 error when directory does not exist."
+  },
+  {
+    "id": "TC005",
+    "title": "get api trajectories name full trajectory file content",
+    "description": "Test GET /api/trajectories/{name} with valid trajectory filename and directory, verify full TrajFile JSON response including trajectory steps, agent info, environment, and submission patch. Also test 404 error for missing file and 422 error for parse errors."
+  },
+  {
+    "id": "TC006",
+    "title": "get api stats aggregate exit status counts",
+    "description": "Test GET /api/stats with valid directory parameter, verify aggregated counts for total, submitted, forfeited, errors, step_limit_reached, and other exit statuses. Also test 404 error when directory is missing."
+  },
+  {
+    "id": "TC007",
+    "title": "get api issues list open github issues",
+    "description": "Test GET /api/issues with valid repo parameter and optional label and limit, verify response includes repo name, count, and array of issues with number, title, url, and labels. Also test 502 error response for invalid repo or GitHub API errors."
+  },
+  {
+    "id": "TC008",
+    "title": "get health liveness readiness probe",
+    "description": "Test GET /health endpoint returns 200 status with JSON containing status ok and version string. Also test non-200 or connection error when service is down or unresponsive."
+  }
+]
