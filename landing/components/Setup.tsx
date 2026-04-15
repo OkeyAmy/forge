@@ -1,7 +1,7 @@
 "use client";
 
 import { useInView } from "@/hooks/useInView";
-import { Terminal, Zap, AlertTriangle } from "lucide-react";
+import { Terminal, Zap, AlertTriangle, Info } from "lucide-react";
 import { useState } from "react";
 
 function CodeBlock({ code, language = "bash" }: { code: string; language?: string }) {
@@ -27,47 +27,59 @@ function WarningBox({ children }: { children: React.ReactNode }) {
   );
 }
 
+function InfoBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3 p-3 rounded-lg border border-accent-blue/20 bg-accent-blue/5 text-xs text-accent-blue/80 leading-relaxed">
+      <Info className="w-4 h-4 text-accent-blue/70 flex-shrink-0 mt-0.5" />
+      <span>{children}</span>
+    </div>
+  );
+}
+
 const CONSUMER_STEPS = [
   {
     label: "Install Docker",
-    description: "That's the only prerequisite. No Rust, no compiling, no build tools.",
-    code: `# Verify Docker is running\ndocker --version`,
+    description: "That's the only prerequisite. No Rust, no compiling, no cloning.",
+    code: `docker --version`,
     language: "bash",
+    note: null,
     warning: null,
   },
   {
-    label: "Clone the repo and copy the config",
-    description: "Forge ships with a ready-to-use docker-compose and forge.yaml that sets up the agent correctly.",
-    code: `git clone https://github.com/OkeyAmy/forge && cd forge\ncp .env.example .env`,
-    language: "bash",
-    warning: null,
-  },
-  {
-    label: "Set your model credentials",
-    description: "Open .env and fill in three values. Use an exact model name — a wrong name silently breaks the agent.",
-    code: `# .env\n\n# Google Gemini (recommended)\nFORGE_MODEL=models/gemini-2.0-flash-001\nFORGE_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai\nFORGE_API_KEY=your-gemini-api-key\n\n# OpenAI\n# FORGE_MODEL=gpt-4o\n# FORGE_BASE_URL=https://api.openai.com/v1\n# FORGE_API_KEY=sk-...`,
+    label: "Create a .env file",
+    description: "Three lines. Pick your model provider and paste in your API key.",
+    code: `# .env — create this file anywhere and run from that directory
+
+# Google Gemini (recommended)
+FORGE_MODEL=models/gemini-2.0-flash-001
+FORGE_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+FORGE_API_KEY=your-api-key
+
+# OpenAI
+# FORGE_MODEL=gpt-4o
+# FORGE_BASE_URL=https://api.openai.com/v1
+# FORGE_API_KEY=sk-...
+
+# Find your Docker group GID: getent group docker | cut -d: -f3
+DOCKER_GID=132`,
     language: ".env",
-    warning: "Model name must be exact. Use models/gemini-2.0-flash-001 not gemini-flash or gemini-3-flash-preview — a wrong name causes the agent to produce gibberish instead of code.",
-  },
-  {
-    label: "Set your Docker GID",
-    description: "Forge needs access to the Docker socket to spin up the sandbox. Find your group ID and add it to .env.",
-    code: `# Find your Docker group GID\ngetent group docker | cut -d: -f3\n\n# Add to .env:\nDOCKER_GID=132   # ← replace with your output`,
-    language: "bash",
-    warning: null,
+    note: null,
+    warning: "Model name must be exact — a wrong name causes the agent to generate text instead of code. Use models/gemini-2.0-flash-001, not gemini-flash or gemini-3-flash-preview.",
   },
   {
     label: "Run against a GitHub issue",
-    description: "Set the repo and issue number in .env, then run. Forge clones the repo, works autonomously, and outputs a git diff patch.",
-    code: `# In .env:\nFORGE_REPO=owner/repo\nFORGE_ISSUE=42\n\n# Run:\ndocker compose run --rm forge`,
+    description: "Pass the repo and issue number. Forge pulls the image, clones the repo inside a sandbox, and works autonomously.",
+    code: `docker compose run --rm \\\n  -e FORGE_REPO=owner/repo \\\n  -e FORGE_ISSUE=42 \\\n  akachiokey/forge:latest`,
     language: "bash",
+    note: "Forge clones the repo internally — you never need to clone it yourself.",
     warning: null,
   },
   {
     label: "Run continuously (watch mode)",
-    description: "Label any GitHub issue with 'forge' — Forge picks it up automatically and fixes it. Restarts itself if it crashes.",
-    code: `# In .env:\nFORGE_WATCH_REPO=owner/repo\nFORGE_WATCH_LABEL=forge\nFORGE_WATCH_INTERVAL=60\n\n# Start:\ndocker compose up watch`,
+    description: "Label any GitHub issue 'forge' — Forge picks it up and fixes it automatically. Runs until you stop it.",
+    code: `# Add to .env:\nFORGE_WATCH_REPO=owner/repo\nFORGE_WATCH_LABEL=forge\nFORGE_WATCH_INTERVAL=60\n\n# Then:\ndocker compose up watch`,
     language: "bash",
+    note: null,
     warning: null,
   },
 ];
@@ -78,27 +90,31 @@ const DEV_STEPS = [
     description: "Docker 24+ and Rust 1.82+ required.",
     code: `docker --version && rustc --version`,
     language: "bash",
+    note: null,
     warning: null,
   },
   {
     label: "Clone & build",
-    description: "Clone and compile the release binary. Build the sandbox image once.",
-    code: `git clone https://github.com/OkeyAmy/forge && cd forge\ncargo build --release -p forge\ndocker build -f Dockerfile.sandbox -t forge-sandbox:latest .`,
+    description: "Clone the Forge repo and compile the release binary.",
+    code: `git clone https://github.com/OkeyAmy/forge && cd forge\ncargo build --release -p forge`,
     language: "bash",
+    note: null,
     warning: null,
   },
   {
     label: "Configure credentials",
-    description: "Set your model credentials in .env. Use an exact model name.",
-    code: `cp .env.example .env\n\n# Edit .env:\nFORGE_MODEL=models/gemini-2.0-flash-001\nFORGE_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai\nFORGE_API_KEY=your-api-key`,
+    description: "Set your model credentials in .env.",
+    code: `cp .env.example .env\n\n# Edit .env:\nFORGE_MODEL=models/gemini-2.0-flash-001\nFORGE_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai\nFORGE_API_KEY=your-api-key\nDOCKER_GID=132`,
     language: ".env",
+    note: null,
     warning: "Model name must be exact. A wrong name causes the agent to produce gibberish instead of code.",
   },
   {
-    label: "Run with a YAML config",
-    description: "The YAML config sets the system template that tells the model to output bash blocks. Without it, some models won't behave correctly.",
-    code: `set -a && source .env && set +a\n\n./target/release/forge run --config forge.yaml`,
+    label: "Run",
+    description: "Load credentials and point Forge at any public GitHub issue.",
+    code: `set -a && source .env && set +a\n\n./target/release/forge run \\\n  --repo owner/repo \\\n  --issue 42`,
     language: "bash",
+    note: null,
     warning: null,
   },
 ];
@@ -150,7 +166,7 @@ export function Setup() {
 
           {mode === "consumer" && (
             <p className="mt-3 text-xs text-muted/50 font-mono">
-              No Rust · No compiling · Docker + .env
+              No Rust · No cloning · No compiling · Just Docker + .env
             </p>
           )}
         </div>
@@ -166,7 +182,6 @@ export function Setup() {
               }}
               className="flex gap-5"
             >
-              {/* Step number + connector */}
               <div className="flex flex-col items-center">
                 <span className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-blue to-accent-purple flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
                   {i + 1}
@@ -176,11 +191,15 @@ export function Setup() {
                 )}
               </div>
 
-              {/* Content */}
               <div className="flex-1 pb-2 min-w-0">
                 <h3 className="font-semibold text-white mb-1">{step.label}</h3>
                 <p className="text-sm text-muted mb-3">{step.description}</p>
                 <CodeBlock code={step.code} language={step.language} />
+                {step.note && (
+                  <div className="mt-2">
+                    <InfoBox>{step.note}</InfoBox>
+                  </div>
+                )}
                 {step.warning && (
                   <div className="mt-2">
                     <WarningBox>{step.warning}</WarningBox>
