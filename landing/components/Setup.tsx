@@ -47,28 +47,32 @@ const CONSUMER_STEPS = [
   },
   {
     label: "Create a .env file",
-    description: "Three lines. Pick your model provider and paste in your API key.",
+    description: "Pick your model provider, paste your API key, and optionally add a GitHub token for automatic PR creation.",
     code: `# .env — create this file anywhere and run from that directory
 
 # Google Gemini (recommended)
 FORGE_MODEL=models/gemini-2.0-flash-001
 FORGE_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-FORGE_API_KEY=your-api-key
+FORGE_API_KEY=your-gemini-api-key
 
 # OpenAI
 # FORGE_MODEL=gpt-4o
 # FORGE_BASE_URL=https://api.openai.com/v1
 # FORGE_API_KEY=sk-...
 
+# GitHub token — enables automatic pull request creation after each fix
+# Create one at: github.com/settings/tokens  (needs repo scope)
+GITHUB_TOKEN=ghp_...
+
 # Find your Docker group GID: getent group docker | cut -d: -f3
 DOCKER_GID=132`,
     language: ".env",
-    note: null,
+    note: "With GITHUB_TOKEN set, Forge automatically opens a pull request after every successful fix.",
     warning: "Model name must be exact — a wrong name causes the agent to generate text instead of code. Use models/gemini-2.0-flash-001, not gemini-flash or gemini-3-flash-preview.",
   },
   {
     label: "Run against a GitHub issue",
-    description: "Pass the repo and issue number. Forge pulls the image, clones the repo inside a sandbox, and works autonomously.",
+    description: "Pass the repo and issue number. Forge pulls the image, clones the repo inside a sandbox, works autonomously, and opens a PR when done.",
     code: `docker compose run --rm \\\n  -e FORGE_REPO=owner/repo \\\n  -e FORGE_ISSUE=42 \\\n  akachiokey/forge:latest`,
     language: "bash",
     note: "Forge clones the repo internally — you never need to clone it yourself.",
@@ -103,8 +107,8 @@ const DEV_STEPS = [
   },
   {
     label: "Configure credentials",
-    description: "Set your model credentials in .env.",
-    code: `cp .env.example .env\n\n# Edit .env:\nFORGE_MODEL=models/gemini-2.0-flash-001\nFORGE_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai\nFORGE_API_KEY=your-api-key\nDOCKER_GID=132`,
+    description: "Set your model credentials and GitHub token in .env.",
+    code: `cp .env.example .env\n\n# Edit .env:\nFORGE_MODEL=models/gemini-2.0-flash-001\nFORGE_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai\nFORGE_API_KEY=your-api-key\nGITHUB_TOKEN=ghp_...\nDOCKER_GID=132`,
     language: ".env",
     note: null,
     warning: "Model name must be exact. A wrong name causes the agent to produce gibberish instead of code.",

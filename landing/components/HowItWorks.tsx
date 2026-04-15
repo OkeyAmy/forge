@@ -12,6 +12,7 @@ const STEPS = [
   "Execute bash commands autonomously",
   "Run submit to capture the git diff",
   "Save the full trajectory to a .traj file",
+  "Push a branch and open a pull request automatically",
 ];
 
 function TerminalAnimation() {
@@ -104,7 +105,7 @@ export function HowItWorks() {
             </span>
           </h2>
           <p className="mt-4 text-muted max-w-xl mx-auto">
-            Eight autonomous steps from issue to patch, no human in the loop.
+            Eight autonomous steps from issue to pull request, no human in the loop.
           </p>
         </div>
 

@@ -38,4 +38,7 @@ export const TERMINAL_LINES: TerminalLine[] = [
   { type: "output", text: "+export function isValidEmail(email: string): boolean {" },
   { type: "output", text: "+  return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);" },
   { type: "output", text: "+}" },
+  { type: "blank",  text: "" },
+  { type: "output", text: "Creating pull request..." },
+  { type: "output", text: "Pull request: https://github.com/owner/repo/pull/43" },
 ];
