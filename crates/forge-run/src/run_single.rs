@@ -48,7 +48,7 @@ impl RunSingle {
                             rp = repo_path
                         ),
                         format!(
-                            "printf '#!/bin/sh\\ncd {rp} && git add -A 2>/dev/null && git diff --cached\\n' > /usr/local/bin/submit && chmod +x /usr/local/bin/submit",
+                            "printf '#!/bin/sh\\ncd {rp} && git add -A 2>/dev/null && git -c color.diff=false diff --cached\\n' > /usr/local/bin/submit && chmod +x /usr/local/bin/submit",
                             rp = repo_path
                         ),
                     ];

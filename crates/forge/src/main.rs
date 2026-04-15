@@ -26,6 +26,8 @@ enum Commands {
     Watch(WatchArgs),
     /// Display trajectory statistics
     QuickStats(QuickStatsArgs),
+    /// Test the pull-request pipeline end-to-end on a real repo
+    TestPr(TestPrArgs),
 }
 
 // ---------------------------------------------------------------------------
@@ -157,6 +159,21 @@ struct QuickStatsArgs {
 }
 
 // ---------------------------------------------------------------------------
+// test-pr
+// ---------------------------------------------------------------------------
+
+#[derive(clap::Args)]
+struct TestPrArgs {
+    /// GitHub repository to test against (owner/repo)
+    #[arg(long, default_value = "OkeyAmy/Axioschat-Onboard")]
+    repo: String,
+
+    /// GitHub personal access token (falls back to GITHUB_TOKEN env var)
+    #[arg(long, env = "GITHUB_TOKEN")]
+    token: String,
+}
+
+// ---------------------------------------------------------------------------
 // GitHub API types
 // ---------------------------------------------------------------------------
 
@@ -202,6 +219,97 @@ async fn main() {
         Commands::Run(args) => run_command(args).await,
         Commands::Watch(args) => watch_command(args).await,
         Commands::QuickStats(args) => quick_stats_command(args).await,
+        Commands::TestPr(args) => test_pr_command(args).await,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// test-pr command
+// ---------------------------------------------------------------------------
+
+async fn test_pr_command(args: TestPrArgs) {
+    let parts: Vec<&str> = args.repo.splitn(2, '/').collect();
+    if parts.len() != 2 {
+        eprintln!("repo must be owner/repo");
+        std::process::exit(1);
+    }
+    let owner = parts[0];
+    let repo = parts[1];
+
+    println!("Testing PR pipeline against {}/{}", owner, repo);
+
+    // Step 1: Clone the repo into a temp dir
+    let tmp_dir = format!("/tmp/forge-test-pr-{}", repo);
+    let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
+
+    let clone_url = format!(
+        "https://x-access-token:{}@github.com/{}/{}.git",
+        args.token, owner, repo
+    );
+    println!("  Cloning {}...", args.repo);
+    let out = tokio::process::Command::new("git")
+        .args(["clone", "--depth", "1", &clone_url, &tmp_dir])
+        .output()
+        .await
+        .expect("git clone");
+    if !out.status.success() {
+        eprintln!(
+            "  FAIL: clone failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
+        std::process::exit(1);
+    }
+    println!("  OK: cloned");
+
+    // Step 2: Create a test file and generate a real git diff
+    let test_file = format!("{}/FORGE_TEST.md", tmp_dir);
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let content = format!(
+        "# Forge PR Pipeline Test\n\nGenerated at Unix timestamp {}.\n\
+         This file verifies the end-to-end PR creation pipeline works.\n",
+        timestamp
+    );
+    tokio::fs::write(&test_file, &content)
+        .await
+        .expect("write test file");
+
+    run_git_in(&tmp_dir, &["config", "user.email", "forge@forge.local"])
+        .await
+        .expect("git config email");
+    run_git_in(&tmp_dir, &["config", "user.name", "Forge"])
+        .await
+        .expect("git config name");
+    run_git_in(&tmp_dir, &["add", "FORGE_TEST.md"])
+        .await
+        .expect("git add");
+
+    // Generate the patch the same way the agent does (staged diff, no color)
+    let diff_out = tokio::process::Command::new("git")
+        .current_dir(&tmp_dir)
+        .args(["-c", "color.diff=false", "diff", "--cached"])
+        .output()
+        .await
+        .expect("git diff");
+    let patch = String::from_utf8_lossy(&diff_out.stdout).to_string();
+    println!("  Patch ({} bytes, {} lines):", patch.len(), patch.lines().count());
+    for (i, line) in patch.lines().enumerate() {
+        println!("    {:>3}: {}", i + 1, line);
+    }
+
+    // Reset so create_pull_request can apply the patch fresh
+    let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
+
+    // Step 3: Run the full PR creation pipeline
+    println!("  Creating pull request...");
+    match create_pull_request(owner, repo, 0, &patch, &args.token).await {
+        Ok(pr_url) => println!("  SUCCESS: {}", pr_url),
+        Err(e) => {
+            eprintln!("  FAIL: {}", e);
+            std::process::exit(1);
+        }
     }
 }
 
