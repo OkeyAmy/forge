@@ -118,9 +118,13 @@ impl BashSession {
                             Ok(bollard::container::LogOutput::StdOut { message }) => {
                                 let text = String::from_utf8_lossy(&message);
                                 stdout_buf.push_str(&text);
-                                // Flush complete lines.
+                                // Flush complete lines, stripping any trailing \r so
+                                // patches and other output never carry carriage-returns
+                                // into the captured stdout string.
                                 while let Some(pos) = stdout_buf.find('\n') {
-                                    let line = stdout_buf[..pos].to_string();
+                                    let line = stdout_buf[..pos]
+                                        .trim_end_matches('\r')
+                                        .to_string();
                                     stdout_buf = stdout_buf[pos + 1..].to_string();
                                     let _ = stdout_tx.send(line);
                                 }
@@ -129,7 +133,9 @@ impl BashSession {
                                 let text = String::from_utf8_lossy(&message);
                                 stderr_buf.push_str(&text);
                                 while let Some(pos) = stderr_buf.find('\n') {
-                                    let line = stderr_buf[..pos].to_string();
+                                    let line = stderr_buf[..pos]
+                                        .trim_end_matches('\r')
+                                        .to_string();
                                     stderr_buf = stderr_buf[pos + 1..].to_string();
                                     let _ = stderr_tx.send(line);
                                 }
@@ -140,7 +146,9 @@ impl BashSession {
                                 let text = String::from_utf8_lossy(&message);
                                 stdout_buf.push_str(&text);
                                 while let Some(pos) = stdout_buf.find('\n') {
-                                    let line = stdout_buf[..pos].to_string();
+                                    let line = stdout_buf[..pos]
+                                        .trim_end_matches('\r')
+                                        .to_string();
                                     stdout_buf = stdout_buf[pos + 1..].to_string();
                                     let _ = stdout_tx.send(line);
                                 }
@@ -151,10 +159,10 @@ impl BashSession {
 
                     // Flush any remaining partial lines when the stream ends.
                     if !stdout_buf.is_empty() {
-                        let _ = stdout_tx.send(stdout_buf);
+                        let _ = stdout_tx.send(stdout_buf.trim_end_matches('\r').to_string());
                     }
                     if !stderr_buf.is_empty() {
-                        let _ = stderr_tx.send(stderr_buf);
+                        let _ = stderr_tx.send(stderr_buf.trim_end_matches('\r').to_string());
                     }
                 });
 

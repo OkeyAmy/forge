@@ -543,42 +543,54 @@ async fn run_git_in(dir: &str, args: &[&str]) -> Result<(), String> {
     }
 }
 
-/// Pipe a patch into `git apply` via stdin, normalising line endings first.
+/// Write a patch to a temp file and apply it with `git apply`, normalising
+/// line endings first.  Using a temp file avoids any stdin-buffering or
+/// EOF-signalling edge cases that can produce "corrupt patch" errors.
 async fn apply_patch_stdin(dir: &str, patch: &str) -> Result<(), String> {
-    use tokio::io::AsyncWriteExt;
-
-    // Normalise CRLF → LF (Docker stdout can introduce \r on some hosts)
-    let mut normalised = patch.replace("\r\n", "\n");
+    // 1. Normalise CRLF → LF, then strip any surviving standalone \r.
+    //    Docker stdout can introduce \r on some hosts; the final line of a
+    //    patch joined with join("\n") may end with "\r" that the CRLF replace
+    //    misses because there is no following "\n" to pair with it.
+    let mut normalised = patch.replace("\r\n", "\n").replace('\r', "");
     if !normalised.ends_with('\n') {
         normalised.push('\n');
     }
 
-    let mut child = tokio::process::Command::new("git")
-        .current_dir(dir)
-        .args(["apply", "--whitespace=nowarn", "-"])
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("failed to spawn git apply: {e}"))?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(normalised.as_bytes())
-            .await
-            .map_err(|e| format!("failed to write patch to git apply: {e}"))?;
-        // Drop stdin → EOF signal
-    }
-
-    let out = child
-        .wait_with_output()
+    // 2. Write the normalised patch to a temp file inside the work tree so
+    //    `git apply` reads a real file rather than stdin (more reliable).
+    let patch_file = format!("{}/forge-apply.patch", dir);
+    tokio::fs::write(&patch_file, normalised.as_bytes())
         .await
-        .map_err(|e| format!("git apply wait error: {e}"))?;
+        .map_err(|e| format!("failed to write patch file: {e}"))?;
+
+    let out = tokio::process::Command::new("git")
+        .current_dir(dir)
+        .args(["apply", "--whitespace=nowarn", &patch_file])
+        .output()
+        .await
+        .map_err(|e| format!("failed to run git apply: {e}"))?;
+
+    // Clean up temp file regardless of outcome.
+    let _ = tokio::fs::remove_file(&patch_file).await;
 
     if out.status.success() {
         Ok(())
     } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        // Diagnostic: log patch stats to help trace future failures.
+        let line_count = normalised.lines().count();
+        let tail: String = normalised
+            .chars()
+            .rev()
+            .take(40)
+            .collect::<String>()
+            .chars()
+            .rev()
+            .collect();
+        eprintln!(
+            "git apply failed ({line_count} lines, last 40 chars: {tail:?}): {stderr}"
+        );
+        Err(stderr)
     }
 }
 
