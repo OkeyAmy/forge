@@ -548,7 +548,10 @@ async fn apply_patch_stdin(dir: &str, patch: &str) -> Result<(), String> {
     use tokio::io::AsyncWriteExt;
 
     // Normalise CRLF → LF (Docker stdout can introduce \r on some hosts)
-    let normalised = patch.replace("\r\n", "\n");
+    let mut normalised = patch.replace("\r\n", "\n");
+    if !normalised.ends_with('\n') {
+        normalised.push('\n');
+    }
 
     let mut child = tokio::process::Command::new("git")
         .current_dir(dir)
@@ -790,5 +793,71 @@ async fn load_watch_state(path: &str) -> WatchState {
 async fn save_watch_state(path: &str, state: &WatchState) {
     if let Ok(json) = serde_json::to_string_pretty(state) {
         let _ = tokio::fs::write(path, json).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::process::Command;
+
+    fn git(dir: &std::path::Path, args: &[&str]) {
+        let output = Command::new("git")
+            .current_dir(dir)
+            .args(args)
+            .output()
+            .expect("failed to run git");
+        assert!(
+            output.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    fn git_output(dir: &std::path::Path, args: &[&str]) -> String {
+        let output = Command::new("git")
+            .current_dir(dir)
+            .args(args)
+            .output()
+            .expect("failed to run git");
+        assert!(
+            output.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout).expect("stdout should be utf-8")
+    }
+
+    #[tokio::test]
+    async fn apply_patch_stdin_accepts_diff_without_trailing_newline() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path();
+
+        git(repo, &["init"]);
+        git(repo, &["config", "user.email", "forge@example.com"]);
+        git(repo, &["config", "user.name", "Forge Tests"]);
+
+        std::fs::write(repo.join("note.txt"), "before\n").expect("write file");
+        git(repo, &["add", "note.txt"]);
+        git(repo, &["commit", "-m", "initial"]);
+
+        std::fs::write(repo.join("note.txt"), "after\n").expect("write file");
+        let diff = git_output(repo, &["diff"]);
+        assert!(diff.ends_with('\n'));
+
+        git(repo, &["checkout", "--", "note.txt"]);
+        let diff_without_final_newline = diff.trim_end_matches('\n').to_string();
+
+        apply_patch_stdin(
+            repo.to_str().expect("repo path should be utf-8"),
+            &diff_without_final_newline,
+        )
+        .await
+        .expect("patch without trailing newline should still apply");
+
+        let contents = std::fs::read_to_string(repo.join("note.txt")).expect("read file");
+        assert_eq!(contents, "after\n");
     }
 }
