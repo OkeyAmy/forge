@@ -299,13 +299,13 @@ async fn test_pr_command(args: TestPrArgs) {
         println!("    {:>3}: {}", i + 1, line);
     }
 
-    // Reset so create_pull_request can apply the patch fresh
+    // Reset so push_fix_branch can apply the patch fresh
     let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
 
-    // Step 3: Run the full PR creation pipeline
-    println!("  Creating pull request...");
-    match create_pull_request(owner, repo, 0, &patch, &args.token).await {
-        Ok(pr_url) => println!("  SUCCESS: {}", pr_url),
+    // Step 3: Push the branch
+    println!("  Pushing branch...");
+    match push_fix_branch(owner, repo, 0, &patch, &args.token).await {
+        Ok(branch) => println!("  SUCCESS: branch pushed → {}", branch),
         Err(e) => {
             eprintln!("  FAIL: {}", e);
             std::process::exit(1);
@@ -437,15 +437,15 @@ async fn run_command(args: RunArgs) {
                         let token = std::env::var("GITHUB_TOKEN").unwrap_or_default();
                         if token.is_empty() {
                             println!(
-                                "\nTip: set GITHUB_TOKEN in your .env to auto-create a pull request."
+                                "\nTip: set GITHUB_TOKEN in your .env to push the fix to a branch automatically."
                             );
                         } else {
-                            println!("\nCreating pull request...");
-                            match create_pull_request(&owner, &repo, issue_number, &patch, &token)
+                            println!("\nPushing fix to branch...");
+                            match push_fix_branch(&owner, &repo, issue_number, &patch, &token)
                                 .await
                             {
-                                Ok(pr_url) => println!("Pull request: {pr_url}"),
-                                Err(e) => eprintln!("Warning: could not create PR: {e}"),
+                                Ok(branch) => println!("Branch pushed: {branch}"),
+                                Err(e) => eprintln!("Warning: could not push branch: {e}"),
                             }
                         }
                     }
@@ -600,26 +600,6 @@ fn github_client() -> reqwest::Client {
         .expect("failed to build HTTP client")
 }
 
-fn github_client_with_token(token: &str) -> reqwest::Client {
-    let mut headers = reqwest::header::HeaderMap::new();
-    headers.insert(
-        reqwest::header::ACCEPT,
-        "application/vnd.github.v3+json".parse().unwrap(),
-    );
-    headers.insert(
-        reqwest::header::USER_AGENT,
-        "Forge/0.1".parse().unwrap(),
-    );
-    headers.insert(
-        reqwest::header::AUTHORIZATION,
-        format!("Bearer {}", token).parse().unwrap(),
-    );
-    reqwest::Client::builder()
-        .default_headers(headers)
-        .build()
-        .expect("failed to build HTTP client")
-}
-
 /// Extract `(owner, repo, issue_number)` from a GitHub issue URL.
 fn extract_github_issue_info(url: &str) -> Option<(String, String, u64)> {
     let stripped = url
@@ -702,15 +682,16 @@ async fn apply_patch_stdin(dir: &str, patch: &str) -> Result<(), String> {
     }
 }
 
-/// Clone the repo, apply the patch on a new branch, push, and open a PR.
-async fn create_pull_request(
+/// Clone the repo, apply the patch on a new branch, and push the branch.
+/// Returns the branch name that was pushed.
+async fn push_fix_branch(
     owner: &str,
     repo: &str,
     issue_number: u64,
     patch: &str,
     token: &str,
 ) -> Result<String, String> {
-    let tmp_dir = format!("/tmp/forge-pr-{}-{}", repo, issue_number);
+    let tmp_dir = format!("/tmp/forge-branch-{}-{}", repo, issue_number);
     let clone_url = format!(
         "https://x-access-token:{}@github.com/{}/{}.git",
         token, owner, repo
@@ -740,7 +721,7 @@ async fn create_pull_request(
     // Create branch
     run_git_in(&tmp_dir, &["checkout", "-b", &branch]).await?;
 
-    // Apply patch via stdin (avoids temp-file encoding issues)
+    // Apply patch
     apply_patch_stdin(&tmp_dir, patch).await?;
 
     // Stage and commit
@@ -748,77 +729,13 @@ async fn create_pull_request(
     let commit_msg = format!("fix: resolve issue #{}", issue_number);
     run_git_in(&tmp_dir, &["commit", "-m", &commit_msg]).await?;
 
-    // Push (force so re-runs update the branch)
+    // Push (force so re-runs update the same branch)
     run_git_in(&tmp_dir, &["push", "--force", "origin", &branch]).await?;
 
     // Cleanup
     let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
 
-    // Create the PR via GitHub API
-    let client = github_client_with_token(token);
-
-    // Get default branch name
-    let repo_json: serde_json::Value = client
-        .get(format!("https://api.github.com/repos/{}/{}", owner, repo))
-        .send()
-        .await
-        .map_err(|e| format!("GitHub API error: {e}"))?
-        .json()
-        .await
-        .map_err(|e| format!("JSON parse error: {e}"))?;
-    let base_branch = repo_json["default_branch"]
-        .as_str()
-        .unwrap_or("main")
-        .to_string();
-
-    // Open the PR
-    let pr_payload = serde_json::json!({
-        "title": format!("fix: resolve issue #{}", issue_number),
-        "body": format!(
-            "Closes #{}\n\n> Automatically generated by [Forge](https://github.com/OkeyAmy/forge).",
-            issue_number
-        ),
-        "head": branch,
-        "base": base_branch,
-    });
-
-    let pr_resp = client
-        .post(format!(
-            "https://api.github.com/repos/{}/{}/pulls",
-            owner, repo
-        ))
-        .json(&pr_payload)
-        .send()
-        .await
-        .map_err(|e| format!("PR API error: {e}"))?;
-
-    let pr_json: serde_json::Value = pr_resp
-        .json()
-        .await
-        .map_err(|e| format!("PR JSON parse error: {e}"))?;
-
-    if let Some(url) = pr_json["html_url"].as_str() {
-        return Ok(url.to_string());
-    }
-
-    // PR might already exist — find it
-    let existing: serde_json::Value = client
-        .get(format!(
-            "https://api.github.com/repos/{}/{}/pulls?head={}:{}&state=open",
-            owner, repo, owner, branch
-        ))
-        .send()
-        .await
-        .map_err(|e| format!("GitHub API error: {e}"))?
-        .json()
-        .await
-        .map_err(|e| format!("JSON parse error: {e}"))?;
-
-    if let Some(url) = existing[0]["html_url"].as_str() {
-        return Ok(format!("{} (updated)", url));
-    }
-
-    Err(format!("PR creation failed: {}", pr_json))
+    Ok(branch)
 }
 
 async fn fetch_issues(
@@ -890,9 +807,9 @@ async fn run_single_issue(
                 if let Some((owner, repo, issue_number)) =
                     extract_github_issue_info(github_url)
                 {
-                    match create_pull_request(&owner, &repo, issue_number, &patch, &token).await {
-                        Ok(pr_url) => println!("  Pull request: {pr_url}"),
-                        Err(e) => eprintln!("  Warning: could not create PR: {e}"),
+                    match push_fix_branch(&owner, &repo, issue_number, &patch, &token).await {
+                        Ok(branch) => println!("  Branch pushed: {branch}"),
+                        Err(e) => eprintln!("  Warning: could not push branch: {e}"),
                     }
                 }
             }
