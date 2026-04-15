@@ -8,6 +8,7 @@ members = [
     "crates/forge-run",
     "crates/forge-plugin",
     "crates/forge",
+    "crates/forge-api",
 ]
 resolver = "2"
 
@@ -29,3 +30,5 @@ tempfile = "3"
 sha2 = "0.10"
 hex = "0.4"
 clap = { version = "4", features = ["derive", "env"] }
+axum = { version = "0.8", features = ["json"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }

@@ -106,3 +106,36 @@ services:
       - quick-stats
       - /trajectories
     restart: "no"
+
+  # ── forge-api (HTTP server for TestSprite / CI integration) ───────────────
+  # Exposes REST endpoints so tools like TestSprite can send HTTP requests
+  # without invoking the CLI directly.
+  #
+  # Usage:
+  #   docker compose up forge-api
+  # Then test with:
+  #   curl http://localhost:8080/health
+  forge-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BIN: forge-api
+    env_file:
+      - .env
+    environment:
+      FORGE_MODEL: ${FORGE_MODEL}
+      FORGE_BASE_URL: ${FORGE_BASE_URL}
+      FORGE_API_KEY: ${FORGE_API_KEY}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      RUST_LOG: ${RUST_LOG:-forge_api=info,tower_http=debug}
+      FORGE_API_PORT: ${FORGE_API_PORT:-5000}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./trajectories:/trajectories
+    group_add:
+      - "${DOCKER_GID:-999}"
+    ports:
+      - "${FORGE_API_PORT:-5000}:${FORGE_API_PORT:-5000}"
+    command: []
+    restart: unless-stopped
