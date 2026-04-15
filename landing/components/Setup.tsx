@@ -68,7 +68,7 @@ GITHUB_TOKEN=ghp_...
 DOCKER_GID=132`,
     language: ".env",
     note: "With GITHUB_TOKEN set, Forge automatically opens a pull request after every successful fix.",
-    warning: "Model name must be exact — a wrong name causes the agent to generate text instead of code. Use models/gemini-2.0-flash-001, not gemini-flash or gemini-3-flash-preview.",
+    warning: null,
   },
   {
     label: "Run against a GitHub issue",
@@ -111,7 +111,7 @@ const DEV_STEPS = [
     code: `cp .env.example .env\n\n# Edit .env:\nFORGE_MODEL=models/gemini-2.0-flash-001\nFORGE_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai\nFORGE_API_KEY=your-api-key\nGITHUB_TOKEN=ghp_...\nDOCKER_GID=132`,
     language: ".env",
     note: null,
-    warning: "Model name must be exact. A wrong name causes the agent to produce gibberish instead of code.",
+    warning: null,
   },
   {
     label: "Run",
