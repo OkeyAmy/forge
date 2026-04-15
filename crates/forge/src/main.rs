@@ -291,6 +291,15 @@ async fn run_command(args: RunArgs) {
         config.problem_statement = ProblemStatementConfigSerde::TextFile { path };
     }
 
+    // Capture issue URL before config is consumed by RunSingle
+    let issue_url = if let ProblemStatementConfigSerde::GithubIssue { ref url } =
+        config.problem_statement
+    {
+        Some(url.clone())
+    } else {
+        None
+    };
+
     let run = match RunSingle::from_run_config(config) {
         Ok(r) => r,
         Err(e) => {
@@ -304,11 +313,35 @@ async fn run_command(args: RunArgs) {
             let exit = result
                 .info
                 .exit_status
+                .clone()
                 .unwrap_or_else(|| "unknown".to_string());
             println!("Run complete. Exit status: {exit}");
-            if let Some(sub) = result.info.submission {
-                let preview: String = sub.chars().take(200).collect();
+
+            if let Some(ref patch) = result.info.submission {
+                let preview: String = patch.chars().take(200).collect();
                 println!("Patch preview:\n{preview}");
+            }
+
+            // Auto-create PR when: exit=submitted + GitHub issue + GITHUB_TOKEN set
+            if exit == "submitted" {
+                if let (Some(url), Some(patch)) = (issue_url, result.info.submission) {
+                    if let Some((owner, repo, issue_number)) = extract_github_issue_info(&url) {
+                        let token = std::env::var("GITHUB_TOKEN").unwrap_or_default();
+                        if token.is_empty() {
+                            println!(
+                                "\nTip: set GITHUB_TOKEN in your .env to auto-create a pull request."
+                            );
+                        } else {
+                            println!("\nCreating pull request...");
+                            match create_pull_request(&owner, &repo, issue_number, &patch, &token)
+                                .await
+                            {
+                                Ok(pr_url) => println!("Pull request: {pr_url}"),
+                                Err(e) => eprintln!("Warning: could not create PR: {e}"),
+                            }
+                        }
+                    }
+                }
             }
         }
         Err(e) => {
@@ -446,15 +479,192 @@ fn github_client() -> reqwest::Client {
         "Forge/0.1".parse().unwrap(),
     );
     if let Ok(token) = std::env::var("GITHUB_TOKEN") {
-        headers.insert(
-            reqwest::header::AUTHORIZATION,
-            format!("Bearer {}", token).parse().unwrap(),
-        );
+        if !token.is_empty() {
+            headers.insert(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer {}", token).parse().unwrap(),
+            );
+        }
     }
     reqwest::Client::builder()
         .default_headers(headers)
         .build()
         .expect("failed to build HTTP client")
+}
+
+fn github_client_with_token(token: &str) -> reqwest::Client {
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert(
+        reqwest::header::ACCEPT,
+        "application/vnd.github.v3+json".parse().unwrap(),
+    );
+    headers.insert(
+        reqwest::header::USER_AGENT,
+        "Forge/0.1".parse().unwrap(),
+    );
+    headers.insert(
+        reqwest::header::AUTHORIZATION,
+        format!("Bearer {}", token).parse().unwrap(),
+    );
+    reqwest::Client::builder()
+        .default_headers(headers)
+        .build()
+        .expect("failed to build HTTP client")
+}
+
+/// Extract `(owner, repo, issue_number)` from a GitHub issue URL.
+fn extract_github_issue_info(url: &str) -> Option<(String, String, u64)> {
+    let stripped = url
+        .trim_start_matches("https://")
+        .trim_start_matches("http://");
+    let rest = stripped.strip_prefix("github.com/")?;
+    let parts: Vec<&str> = rest.split('/').collect();
+    if parts.len() >= 4 && parts[2] == "issues" {
+        let owner = parts[0].to_string();
+        let repo = parts[1].to_string();
+        let number: u64 = parts[3].parse().ok()?;
+        Some((owner, repo, number))
+    } else {
+        None
+    }
+}
+
+async fn run_git_in(dir: &str, args: &[&str]) -> Result<(), String> {
+    let out = tokio::process::Command::new("git")
+        .current_dir(dir)
+        .args(args)
+        .output()
+        .await
+        .map_err(|e| format!("failed to spawn git: {e}"))?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
+}
+
+/// Clone the repo, apply the patch on a new branch, push, and open a PR.
+async fn create_pull_request(
+    owner: &str,
+    repo: &str,
+    issue_number: u64,
+    patch: &str,
+    token: &str,
+) -> Result<String, String> {
+    let tmp_dir = format!("/tmp/forge-pr-{}-{}", repo, issue_number);
+    let clone_url = format!(
+        "https://x-access-token:{}@github.com/{}/{}.git",
+        token, owner, repo
+    );
+    let branch = format!("forge/issue-{}", issue_number);
+
+    // Remove stale temp dir if present
+    let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
+
+    // Clone
+    let out = tokio::process::Command::new("git")
+        .args(["clone", "--depth", "1", &clone_url, &tmp_dir])
+        .output()
+        .await
+        .map_err(|e| format!("git clone failed: {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "git clone failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+
+    // Set identity
+    run_git_in(&tmp_dir, &["config", "user.email", "forge@forge.local"]).await?;
+    run_git_in(&tmp_dir, &["config", "user.name", "Forge"]).await?;
+
+    // Create branch
+    run_git_in(&tmp_dir, &["checkout", "-b", &branch]).await?;
+
+    // Write patch and apply
+    let patch_file = format!("/tmp/forge-patch-{}.diff", issue_number);
+    tokio::fs::write(&patch_file, patch)
+        .await
+        .map_err(|e| format!("failed to write patch file: {e}"))?;
+    run_git_in(&tmp_dir, &["apply", "--whitespace=fix", &patch_file]).await?;
+
+    // Stage and commit
+    run_git_in(&tmp_dir, &["add", "-A"]).await?;
+    let commit_msg = format!("fix: resolve issue #{}", issue_number);
+    run_git_in(&tmp_dir, &["commit", "-m", &commit_msg]).await?;
+
+    // Push (force so re-runs update the branch)
+    run_git_in(&tmp_dir, &["push", "--force", "origin", &branch]).await?;
+
+    // Cleanup
+    let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
+    let _ = tokio::fs::remove_file(&patch_file).await;
+
+    // Create the PR via GitHub API
+    let client = github_client_with_token(token);
+
+    // Get default branch name
+    let repo_json: serde_json::Value = client
+        .get(format!("https://api.github.com/repos/{}/{}", owner, repo))
+        .send()
+        .await
+        .map_err(|e| format!("GitHub API error: {e}"))?
+        .json()
+        .await
+        .map_err(|e| format!("JSON parse error: {e}"))?;
+    let base_branch = repo_json["default_branch"]
+        .as_str()
+        .unwrap_or("main")
+        .to_string();
+
+    // Open the PR
+    let pr_payload = serde_json::json!({
+        "title": format!("fix: resolve issue #{}", issue_number),
+        "body": format!(
+            "Closes #{}\n\n> Automatically generated by [Forge](https://github.com/OkeyAmy/forge).",
+            issue_number
+        ),
+        "head": branch,
+        "base": base_branch,
+    });
+
+    let pr_resp = client
+        .post(format!(
+            "https://api.github.com/repos/{}/{}/pulls",
+            owner, repo
+        ))
+        .json(&pr_payload)
+        .send()
+        .await
+        .map_err(|e| format!("PR API error: {e}"))?;
+
+    let pr_json: serde_json::Value = pr_resp
+        .json()
+        .await
+        .map_err(|e| format!("PR JSON parse error: {e}"))?;
+
+    if let Some(url) = pr_json["html_url"].as_str() {
+        return Ok(url.to_string());
+    }
+
+    // PR might already exist — find it
+    let existing: serde_json::Value = client
+        .get(format!(
+            "https://api.github.com/repos/{}/{}/pulls?head={}:{}&state=open",
+            owner, repo, owner, branch
+        ))
+        .send()
+        .await
+        .map_err(|e| format!("GitHub API error: {e}"))?
+        .json()
+        .await
+        .map_err(|e| format!("JSON parse error: {e}"))?;
+
+    if let Some(url) = existing[0]["html_url"].as_str() {
+        return Ok(format!("{} (updated)", url));
+    }
+
+    Err(format!("PR creation failed: {}", pr_json))
 }
 
 async fn fetch_issues(
@@ -511,10 +721,31 @@ async fn run_single_issue(
 
     let run = RunSingle::from_run_config(config).map_err(|e| e.to_string())?;
     let result = run.run().await.map_err(|e| e.to_string())?;
-    Ok(result
+
+    let exit = result
         .info
         .exit_status
-        .unwrap_or_else(|| "unknown".to_string()))
+        .clone()
+        .unwrap_or_else(|| "unknown".to_string());
+
+    // Auto-create PR on submission
+    if exit == "submitted" {
+        if let Some(patch) = result.info.submission {
+            let token = std::env::var("GITHUB_TOKEN").unwrap_or_default();
+            if !token.is_empty() {
+                if let Some((owner, repo, issue_number)) =
+                    extract_github_issue_info(github_url)
+                {
+                    match create_pull_request(&owner, &repo, issue_number, &patch, &token).await {
+                        Ok(pr_url) => println!("  Pull request: {pr_url}"),
+                        Err(e) => eprintln!("  Warning: could not create PR: {e}"),
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(exit)
 }
 
 async fn load_watch_state(path: &str) -> WatchState {
