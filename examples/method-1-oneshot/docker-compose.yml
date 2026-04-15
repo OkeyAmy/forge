@@ -7,22 +7,16 @@ services:
       FORGE_MODEL: ${FORGE_MODEL}
       FORGE_BASE_URL: ${FORGE_BASE_URL}
       FORGE_API_KEY: ${FORGE_API_KEY}
+      FORGE_REPO: ${FORGE_REPO:-OkeyAmy/Axioschat-Onboard}
+      FORGE_ISSUE: ${FORGE_ISSUE:-27}
       RUST_LOG: ${RUST_LOG:-forge=warn}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ../trajectories:/trajectories
+      - ./forge.yaml:/config.yaml:ro
     group_add:
-      - "${DOCKER_GID:-999}"
-    command:
-      - run
-      - --repo
-      - "${FORGE_REPO:-OkeyAmy/Axioschat-Onboard}"
-      - --issue
-      - "${FORGE_ISSUE:-27}"
-      - --image
-      - akachiokey/forge-sandbox:latest
-      - --output-dir
-      - /trajectories
+      - "${DOCKER_GID:-132}"
+    command: [run, --config, /config.yaml]
     restart: "no"
 
   quick-stats:
