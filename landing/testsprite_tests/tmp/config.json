@@ -1,0 +1,18 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3000",
+  "executionArgs": {
+    "projectName": "forge-landing",
+    "projectPath": "/home/okey/Desktop/Projects/agent-challenge/examples/SWEagent/landing",
+    "testIds": [],
+    "additionalInstruction": "Frontend landing only: http://localhost:3000/ single route /. ONLY GitHub links require click or strict external handoff; validate href, target=_blank, rel=noopener noreferrer on landing DOM (data-testid link-github-*). All other sections: visibility + scroll or hashes #features #how-it-works #setup #model-config—do NOT require clicking setup mode toggles or model provider tabs. Do not call forge-api. Pass if external sites fail to load but landing markup is correct.",
+    "serverMode": "production",
+    "envs": {
+      "API_KEY": "sk-user-FBu-VtjZ0dbA6ujBpXVc_PlFXF_Egc7_5I98XUPxrPyN32Z2j7e7JZTKUQ59NxFmFjNFVMhJJ-PPw4mwZ3l2jJrHQ08o7ct_qJXMQ0azKd0HHGbAVm64SR8taS-ha2fKieg"
+    }
+  },
+  "serverPort": 39583,
+  "proxy": "http://ac6284ec-bfd8-4496-ad3a-519f3074d492:6kE9kP9iHm9b71oU0sBzXn9FPicpfqnM@tun.testsprite.com:8080"
+}

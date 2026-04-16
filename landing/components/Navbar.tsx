@@ -28,11 +28,18 @@ export function Navbar() {
           </span>
         </a>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+          <a href="#features" className="text-sm text-muted hover:text-white transition-colors">
+            Features
+          </a>
+          <a href="#how-it-works" className="text-sm text-muted hover:text-white transition-colors">
+            How it works
+          </a>
           <a
             href="https://github.com/OkeyAmy/forge"
             target="_blank"
             rel="noopener noreferrer"
+            data-testid="link-github-nav"
             className="text-sm text-muted hover:text-white transition-colors"
           >
             GitHub

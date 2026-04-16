@@ -45,6 +45,7 @@ export function Hero() {
           href="https://github.com/OkeyAmy/forge"
           target="_blank"
           rel="noopener noreferrer"
+          data-testid="link-github-hero"
           className="flex items-center gap-2 px-6 py-3 rounded-xl border border-white/10 text-white/80 font-semibold hover:border-white/20 hover:text-white transition-all"
         >
           <Github className="w-4 h-4" />

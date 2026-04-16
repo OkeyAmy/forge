@@ -1,0 +1,97 @@
+[
+  {
+    "id": "TC001",
+    "title": "Hero content renders on first load",
+    "description": "Verifies the landing loads and the hero headline and body copy are visible.",
+    "category": "Landing — visibility",
+    "steps": [
+      { "type": "action", "description": "Navigate to /" },
+      { "type": "assertion", "description": "Verify hero headline and supporting description are visible" },
+      { "type": "assertion", "description": "Verify primary on-page actions are visible (no interaction required beyond load)" }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC002",
+    "title": "Setup section reachable by in-page navigation or scroll",
+    "description": "Verifies visitors can reach the setup documentation without relying on clicking mode toggles; use scrolling or direct URL with hash #setup.",
+    "category": "Landing — navigation",
+    "steps": [
+      { "type": "action", "description": "Navigate to /#setup or scroll until the Setup section is in view" },
+      { "type": "assertion", "description": "Verify the Setup section heading and instructional content are visible" },
+      { "type": "assertion", "description": "Verify Docker-oriented setup copy and code examples are visible (default view)" }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC003",
+    "title": "Model configuration section is visible with example snippet",
+    "description": "Verifies the model-agnostic section shows provider options and a non-empty .env example without requiring tab or button clicks.",
+    "category": "Landing — visibility",
+    "steps": [
+      { "type": "action", "description": "Scroll to the model configuration section (or navigate to /#model-config)" },
+      { "type": "assertion", "description": "Verify section heading and provider labels (e.g. OpenAI, Google Gemini) are visible" },
+      { "type": "assertion", "description": "Verify a code or example block shows FORGE_MODEL / FORGE_BASE_URL style configuration text" }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC004",
+    "title": "Setup mode controls are visible (no toggle verification)",
+    "description": "Verifies Docker and Build from source controls are present for users; do not require clicking them—visibility only.",
+    "category": "Landing — visibility",
+    "steps": [
+      { "type": "action", "description": "Scroll to the Setup section" },
+      { "type": "assertion", "description": "Verify labels or controls for Docker and Build from source are visible" }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC005",
+    "title": "GitHub repository links use new tab and safe rel (DOM or single click)",
+    "description": "The only mandatory external interaction is GitHub. Prefer inspecting href, target, and rel on anchors (e.g. data-testid link-github-hero, link-github-nav, link-github-footer). If the runner cannot read the DOM, one click on a GitHub link is allowed; do not require the remote github.com page to load in restricted environments.",
+    "category": "Landing — GitHub handoff",
+    "steps": [
+      { "type": "action", "description": "Navigate to /" },
+      { "type": "action", "description": "Locate a GitHub anchor (hero, navbar, or footer)" },
+      { "type": "assertion", "description": "Verify href points to the Forge GitHub repository URL" },
+      { "type": "assertion", "description": "Verify target is _blank and rel includes noopener and noreferrer" }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC006",
+    "title": "How it works section visible after scroll or hash",
+    "description": "Verifies process steps and terminal area are visible without clicking non-GitHub controls.",
+    "category": "Landing — visibility",
+    "steps": [
+      { "type": "action", "description": "Navigate to /#how-it-works or scroll until the How it works section is in view" },
+      { "type": "assertion", "description": "Verify section heading and numbered or listed process steps are visible" },
+      { "type": "assertion", "description": "Verify a terminal-style panel or animation region is visible" }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC007",
+    "title": "Linear journey: features through footer without interactive toggles",
+    "description": "Scroll (or use hashes) from Features through How it works, Setup, Model config, and Footer; confirm each region has visible content.",
+    "category": "Landing — navigation",
+    "steps": [
+      { "type": "action", "description": "From /, scroll through #features, #how-it-works, #setup, #model-config, then footer" },
+      { "type": "assertion", "description": "Verify each section exposes readable headings or body content when brought into view" }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC008",
+    "title": "Footer branding and external link markup",
+    "description": "Verifies footer branding and that external anchors use safe attributes; visibility and DOM checks only—no requirement to load third-party sites.",
+    "category": "Landing — footer",
+    "steps": [
+      { "type": "action", "description": "Scroll to the footer" },
+      { "type": "assertion", "description": "Verify Forge branding and copyright year are visible" },
+      { "type": "assertion", "description": "Verify footer links that open new tabs include target=_blank and rel with noopener (and noreferrer where applicable)" }
+    ],
+    "priority": "Medium"
+  }
+]

@@ -1,0 +1,77 @@
+{
+  "meta": {
+    "project": "Forge landing (landing/)",
+    "date": "2026-04-16",
+    "prepared_by": "Repository maintainers"
+  },
+  "product_overview": "A Next.js 14 marketing site for Forge: hero, features (#features), how-it-works (#how-it-works), setup guide (#setup), model examples (#model-config), and footer. Content is documentation-style. Only GitHub links are the primary external handoff; other UI is validated by scrolling or hash navigation and by visibility—not by clicking setup or provider toggles in automated tests.",
+  "test_automation_policy": {
+    "mandatory_external_click": ["GitHub repository anchors only when a click is required"],
+    "visibility_only_no_tab_or_toggle_clicks": ["Setup mode switcher (Docker / Build from source)", "Model provider selector buttons"],
+    "navigation": ["Scroll the page", "Use URLs with hashes /#features, /#how-it-works, /#setup, /#model-config"],
+    "restricted_environments": "If github.com or partner sites do not load in the test browser, pass GitHub tests when href, target=_blank, and rel include noopener and noreferrer on the landing origin."
+  },
+  "core_goals": [
+    "Orient visitors and link to the GitHub repository safely",
+    "Show setup and model configuration as readable, copy-friendly content",
+    "Explain the product flow via on-page sections discoverable by scrolling or hashes"
+  ],
+  "features": [
+    {
+      "name": "Hero and primary navigation",
+      "description": "Hero messaging; GitHub links with safe external attributes; Get Started links to #setup.",
+      "user_flows": [
+        "Open / -> See hero content",
+        "Open /#setup or scroll -> Setup section visible",
+        "Inspect or use GitHub link -> href/target/rel correct on landing DOM"
+      ]
+    },
+    {
+      "name": "Features",
+      "description": "Grid of capability cards at #features.",
+      "user_flows": ["Open /#features or scroll -> Feature cards visible"]
+    },
+    {
+      "name": "Setup guide",
+      "description": "Docker-first copy with Build from source option; toggles exist for humans, tests assert visibility only.",
+      "user_flows": ["Scroll to #setup -> Steps and code blocks visible -> Mode labels visible"]
+    },
+    {
+      "name": "Model provider examples",
+      "description": "Static .env examples; tests assert section and default snippet visibility without clicking tabs.",
+      "user_flows": ["Scroll to #model-config -> Provider names and example block visible"]
+    },
+    {
+      "name": "How it works",
+      "description": "Illustrative terminal and eight steps at #how-it-works.",
+      "user_flows": ["Open /#how-it-works or scroll -> Steps and terminal region visible"]
+    },
+    {
+      "name": "Footer",
+      "description": "Branding and external links with safe new-tab attributes.",
+      "user_flows": ["Scroll to footer -> Branding visible -> External links have target _blank and rel noopener noreferrer"]
+    }
+  ],
+  "out_of_scope": ["forge-api", "In-browser agent or Docker execution"],
+  "code_summary": {
+    "version": "2",
+    "type": "frontend",
+    "tech_stack": ["TypeScript", "Next.js 14 (App Router)", "Tailwind CSS", "React hooks and lucide-react icons"],
+    "routes": [
+      {
+        "path": "/",
+        "file": "app/page.tsx",
+        "auth_required": false,
+        "description": "Single-page landing with hash sections: features, how-it-works, setup, model-config"
+      }
+    ],
+    "features": [],
+    "known_limitations": [
+      {
+        "issue": "Cloud test browsers may not reach external sites",
+        "location": "GitHub and partner URLs",
+        "impact": "Validate link markup on localhost; do not require remote page load"
+      }
+    ]
+  }
+}

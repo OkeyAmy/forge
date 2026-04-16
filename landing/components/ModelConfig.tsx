@@ -83,7 +83,9 @@ export function ModelConfig() {
           <div className="flex flex-wrap gap-2 mb-4">
             {PROVIDER_EXAMPLES.map((p, i) => (
               <button
+                type="button"
                 key={p.name}
+                aria-pressed={activeProvider === i}
                 onClick={() => setActiveProvider(i)}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all border ${
                   activeProvider === i
@@ -95,6 +97,10 @@ export function ModelConfig() {
               </button>
             ))}
           </div>
+          <p className="mb-2 text-sm text-muted" aria-live="polite">
+            Example <code className="font-mono text-xs bg-code-bg px-1 rounded">.env</code> for{" "}
+            <span className="text-white font-medium">{PROVIDER_EXAMPLES[activeProvider].name}</span>
+          </p>
           <CodeBlock code={PROVIDER_EXAMPLES[activeProvider].code} language=".env" />
           <p className="mt-2 text-xs text-muted">
             Copy the relevant block into your <code className="font-mono bg-code-bg px-1 rounded">.env</code> file. These three variables are the only ones required to start.

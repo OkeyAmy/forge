@@ -142,9 +142,11 @@ export function Setup() {
             You pick the issue. Forge does the work.
           </p>
 
-          {/* Mode toggle */}
-          <div className="mt-8 inline-flex items-center gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/10">
+          {/* Mode toggle — z-index so steps / overlays never intercept clicks */}
+          <div className="relative z-20 mt-8 inline-flex items-center gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/10">
             <button
+              type="button"
+              aria-pressed={mode === "consumer"}
               onClick={() => setMode("consumer")}
               className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-all ${
                 mode === "consumer"
@@ -156,6 +158,8 @@ export function Setup() {
               Docker
             </button>
             <button
+              type="button"
+              aria-pressed={mode === "dev"}
               onClick={() => setMode("dev")}
               className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-all ${
                 mode === "dev"
@@ -168,9 +172,13 @@ export function Setup() {
             </button>
           </div>
 
-          {mode === "consumer" && (
+          {mode === "consumer" ? (
             <p className="mt-3 text-xs text-muted/50 font-mono">
               No Rust · No cloning · No compiling · Just Docker + .env
+            </p>
+          ) : (
+            <p className="mt-3 text-xs text-muted/50 font-mono">
+              Rust 1.82+ · Clone repo · cargo build --release · run binary locally
             </p>
           )}
         </div>

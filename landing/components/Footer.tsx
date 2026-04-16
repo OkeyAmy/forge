@@ -34,6 +34,7 @@ export function Footer() {
             href="https://github.com/OkeyAmy/forge"
             target="_blank"
             rel="noopener noreferrer"
+            data-testid="link-github-footer"
             className="flex items-center gap-1.5 hover:text-white transition-colors"
           >
             <Github className="w-4 h-4" />

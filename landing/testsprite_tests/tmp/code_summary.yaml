@@ -1,0 +1,104 @@
+# Forge landing — TestSprite code summary
+# Test policy: Only GitHub URLs are mandatory click/external handoff targets.
+# All other areas: visibility + scroll or hash navigation (#features, #how-it-works, #setup, #model-config).
+# Do not require clicking setup mode toggles or model-provider tab buttons in generated tests.
+version: "2"
+type: frontend
+tech_stack:
+  - TypeScript
+  - Next.js 14 (App Router)
+  - Tailwind CSS
+  - React hooks and lucide-react icons
+
+test_automation_policy:
+  click_required:
+    - GitHub repository links only (hero, navbar, footer) when a click is needed; prefer DOM attribute checks first.
+  no_click_required:
+    - Setup Docker / Build from source mode switcher (verify controls and default content are visible only).
+    - Model provider tab buttons (verify section, labels, and default snippet are visible only).
+  navigation_allowed:
+    - Scroll; direct navigation to /#features, /#how-it-works, /#setup, /#model-config; in-page anchor links.
+  external_load:
+    - Do not fail tests if github.com or partner sites fail to load in the test runner; validate markup on the landing origin instead.
+
+routes:
+  - path: /
+    file: app/page.tsx
+    auth_required: false
+    description: >
+      Single-page marketing site: Navbar, Hero, Features (#features), HowItWorks (#how-it-works),
+      Setup (#setup), ModelConfig (#model-config), Footer. Illustrative content only.
+
+features:
+  - name: Hero and primary navigation
+    description: Hero copy; GitHub links (external); Get Started uses #setup.
+    files:
+      - app/page.tsx
+      - components/Hero.tsx
+      - components/Navbar.tsx
+    entry_route: /
+    user_interactions:
+      - Load / and read hero headline and description
+      - Scroll or follow #setup to reach setup documentation
+      - Optional click on GitHub to hand off to repo (only external click tests should target this)
+    api_calls: []
+    auth_required: false
+
+  - name: Features grid
+    description: Product capabilities; section id features.
+    files:
+      - components/Features.tsx
+    entry_route: /
+    user_interactions:
+      - Scroll to or open /#features and confirm feature cards are visible
+    api_calls: []
+    auth_required: false
+
+  - name: Setup guide
+    description: Docker (default) and Build from source copy with mode controls; no test requirement to toggle.
+    files:
+      - components/Setup.tsx
+    entry_route: /
+    user_interactions:
+      - Scroll to #setup; confirm setup steps and code blocks are visible; confirm both mode labels are visible
+    api_calls: []
+    auth_required: false
+
+  - name: Model provider examples
+    description: Static .env examples; provider buttons exist but tests should not depend on clicking them.
+    files:
+      - components/ModelConfig.tsx
+    entry_route: /
+    user_interactions:
+      - Scroll to #model-config; confirm provider names and an example configuration block are visible
+    api_calls: []
+    auth_required: false
+
+  - name: How it works
+    description: Illustrative terminal and step list; section id how-it-works.
+    files:
+      - components/HowItWorks.tsx
+    entry_route: /
+    user_interactions:
+      - Scroll to or open /#how-it-works; confirm steps and terminal region are visible
+    api_calls: []
+    auth_required: false
+
+  - name: Footer
+    description: Branding, GitHub, partner links with target _blank and noopener noreferrer.
+    files:
+      - components/Footer.tsx
+    entry_route: /
+    user_interactions:
+      - Scroll to footer; confirm branding; confirm link markup via DOM where possible
+    api_calls: []
+    auth_required: false
+
+out_of_scope_for_frontend_tests:
+  - forge-api and any /api/* routes
+  - Running Docker, Forge CLI, or validating remote GitHub HTML inside the test browser
+
+known_limitations:
+  - issue: External sites may be unreachable from TestSprite cloud browsers
+    location: GitHub and partner links
+    impact: Pass when href, target, and rel are correct on the landing page origin
