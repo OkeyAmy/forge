@@ -2,6 +2,8 @@
 
 **Forge** is an autonomous AI software-engineering agent. Point it at any GitHub issue and it will clone the repository, write the fix, and produce a verified git diff patch — all inside an isolated Docker sandbox, driven by any OpenAI-compatible model API.
 
+Tested with [TestSprite](https://www.testsprite.com/)  — see `testsprite_tests/` and `landing/testsprite_tests` for generated test cases and reports.
+
 It integrates with [ElizaOS](https://elizaos.com) as a first-class action handler and can be deployed on decentralised compute via [Nosana](https://nosana.com).
 
 ---
@@ -242,6 +244,58 @@ nosana job post \
 Or paste the job definition JSON into the [Nosana Dashboard](https://dashboard.nosana.com/deploy).
 
 ---
+
+## Running the HTTP API (forge-api)
+
+TestSprite and other integration tools expect an HTTP surface to test against. This repository includes a thin Axum wrapper crate at `crates/forge-api` that exposes the core Forge functionality over HTTP (port 8080 by default). The service maps CLI commands to REST endpoints such as:
+
+- `GET /health` — liveness/readiness probe  
+- `POST /api/run` — trigger a single `RunSingle::run()` agent execution  
+- `POST /api/run/batch` — run multiple items in parallel  
+- `GET /api/issues` — list GitHub issues (wraps existing GitHub client logic)  
+- `GET /api/stats` — aggregate trajectory statistics  
+- `POST/GET/DELETE /api/watch` — start/inspect/stop the label watcher
+
+Quick start (compose-managed):
+
+```bash
+# start forge-api and dependent services
+docker compose up forge-api -d
+# or run the full stack:
+docker compose up -d
+```
+
+Important notes:
+- If you run `forge-api` inside Docker, the service needs access to the Docker socket to spawn sandbox containers. Ensure the `forge-api` service in `docker-compose.yml` includes the host socket mount:
+
+```yaml
+services:
+  forge-api:
+    # ...
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+```
+
+- Provide required environment variables (see the Environment variables section below) to allow the server and agent to authenticate with your model provider and GitHub.
+
+## TestSprite integration & automated tests
+
+This project includes TestSprite-generated tests and reports under `testsprite_tests/` and `landing/testsprite_tests/`. The test set covers:
+
+- Backend API tests (HTTP) for `crates/forge-api` (bootstrap expects the API on `localhost:8080`)  
+- Frontend UI tests for the Next.js landing site (visual/DOM checks, scroll/hash navigation)
+
+To run TestSprite tests locally:
+
+1. Ensure `forge-api` is running on port `8080` (see previous section).  
+2. Start the Next.js landing server if you want to run frontend checks: `cd landing && pnpm dev` (or build + start for a stable environment).  
+3. Use your TestSprite client / MCP dashboard to bootstrap the project pointing at the appropriate local ports. In TestSprite configuration, point the backend tests to `localPort: 8080` and the frontend tests to your landing server port (usually `3000`).
+
+Notes and troubleshooting:
+- Runner environment: TestSprite executes tests in an environment that may differ from your local shell. Make sure required env vars (FORGE_MODEL, FORGE_BASE_URL, FORGE_API_KEY, GITHUB_TOKEN) are available to the services under test.  
+- Docker-in-Docker: If the server runs inside Docker, do not forget the socket mount described above. Missing socket access commonly causes `500` errors in `POST /api/run`.  
+- DOM assertions for external links: Frontend tests validate link attributes on the landing page itself (look for `data-testid` on GitHub anchors). External site navigation may be blocked or lose DOM context; prefer DOM attribute checks over full external navigation for reliability.
+
 
 ## Output — trajectories
 

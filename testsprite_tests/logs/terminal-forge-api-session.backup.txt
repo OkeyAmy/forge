@@ -1,0 +1,445 @@
+---
+pid: 637803
+cwd: /home/okey/Desktop/Projects/agent-challenge/examples/SWEagent
+active_command: cargo run -p forge-api
+last_command: cargo run -p forge-api
+last_exit_code: 130
+---
+To https://github.com/OkeyAmy/forge.git
+   0620fd4..2c2014f  main -> main
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ cargo run -p forge-api/
+error: invalid character `/` in package name: `forge-api/`, characters must be Unicode XID characters (numbers, `-`, `_`, or most letters)
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ cargo run -p forge-api
+   Compiling serde_core v1.0.228
+   Compiling tracing v0.1.44
+   Compiling memchr v2.8.0
+   Compiling matchit v0.8.4
+   Compiling h2 v0.4.13
+   Compiling tower v0.5.3
+   Compiling axum-core v0.5.6
+   Compiling aho-corasick v1.1.4
+   Compiling tower-http v0.6.8
+   Compiling regex-automata v0.4.14
+   Compiling serde v1.0.228
+   Compiling serde_json v1.0.149
+   Compiling serde_with v3.18.0
+   Compiling uuid v1.23.0
+   Compiling serde_path_to_error v0.1.20
+   Compiling serde_urlencoded v0.7.1
+   Compiling serde_yaml v0.9.34+deprecated
+   Compiling forge-types v0.1.0 (/home/okey/Desktop/Projects/agent-challenge/examples/SWEagent/crates/forge-types)
+   Compiling hyper v1.9.0
+   Compiling bollard-stubs v1.47.1-rc.27.3.1
+   Compiling regex v1.12.3
+   Compiling matchers v0.2.0
+   Compiling tracing-subscriber v0.3.23
+   Compiling forge-tools v0.1.0 (/home/okey/Desktop/Projects/agent-challenge/examples/SWEagent/crates/forge-tools)
+   Compiling hyper-util v0.1.20
+   Compiling hyperlocal v0.9.1
+   Compiling hyper-tls v0.6.0
+   Compiling axum v0.8.9
+   Compiling reqwest v0.12.28
+   Compiling forge-model v0.1.0 (/home/okey/Desktop/Projects/agent-challenge/examples/SWEagent/crates/forge-model)
+   Compiling bollard v0.18.1
+   Compiling forge-env v0.1.0 (/home/okey/Desktop/Projects/agent-challenge/examples/SWEagent/crates/forge-env)
+   Compiling forge-agent v0.1.0 (/home/okey/Desktop/Projects/agent-challenge/examples/SWEagent/crates/forge-agent)
+   Compiling forge-run v0.1.0 (/home/okey/Desktop/Projects/agent-challenge/examples/SWEagent/crates/forge-run)
+   Compiling forge-api v0.1.0 (/home/okey/Desktop/Projects/agent-challenge/examples/SWEagent/crates/forge-api)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 27.01s
+     Running `target/debug/forge-api`
+
+thread 'main' (615878) panicked at crates/forge-api/src/main.rs:33:29:
+Failed to bind 0.0.0.0:8080: Address already in use (os error 98)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ cargo run -p forge-api
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running `target/debug/forge-api`
+
+thread 'main' (617586) panicked at crates/forge-api/src/main.rs:33:29:
+Failed to bind 0.0.0.0:8080: Address already in use (os error 98)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ cargo run -p forge-api
+   Compiling forge-api v0.1.0 (/home/okey/Desktop/Projects/agent-challenge/examples/SWEagent/crates/forge-api)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.77s
+     Running `target/debug/forge-api`
+
+thread 'main' (618918) panicked at crates/forge-api/src/main.rs:33:29:
+Failed to bind 0.0.0.0:5000: Address already in use (os error 98)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ cargo run -p forge-api
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s
+     Running `target/debug/forge-api`
+2026-04-15T07:15:47.798990Z  INFO forge_api: forge-api listening on 0.0.0.0:5000
+^C
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ git add .
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ git commit -m "added http server wrapper for forge"
+[main efed0dc] added http server wrapper for forge
+ 13 files changed, 876 insertions(+), 224 deletions(-)
+ create mode 100644 TESTSPRITE_PRD.md
+ create mode 100644 crates/forge-api/Cargo.toml
+ create mode 100644 crates/forge-api/src/main.rs
+ create mode 100644 crates/forge-api/src/routes/health.rs
+ create mode 100644 crates/forge-api/src/routes/issues.rs
+ create mode 100644 crates/forge-api/src/routes/mod.rs
+ create mode 100644 crates/forge-api/src/routes/run.rs
+ create mode 100644 crates/forge-api/src/routes/stats.rs
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ git push origin main 
+Enumerating objects: 57, done.
+Counting objects: 100% (57/57), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (35/35), done.
+Writing objects: 100% (37/37), 15.93 KiB | 906.00 KiB/s, done.
+Total 37 (delta 20), reused 0 (delta 0), pack-reused 0
+remote: Resolving deltas: 100% (20/20), completed with 17 local objects.
+remote: 
+remote: GitHub found 34 vulnerabilities on OkeyAmy/forge's default branch (2 critical, 12 high, 16 moderate, 4 low). To find out more, visit:
+remote:      https://github.com/OkeyAmy/forge/security/dependabot
+remote: 
+To https://github.com/OkeyAmy/forge.git
+   2c2014f..efed0dc  main -> main
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ git add .
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ git commit -m "update"
+[main 812f196] update
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ git push origin main 
+Enumerating objects: 9, done.
+Counting objects: 100% (9/9), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (5/5), done.
+Writing objects: 100% (5/5), 422 bytes | 422.00 KiB/s, done.
+Total 5 (delta 4), reused 0 (delta 0), pack-reused 0
+remote: Resolving deltas: 100% (4/4), completed with 4 local objects.
+remote: 
+remote: GitHub found 34 vulnerabilities on OkeyAmy/forge's default branch (2 critical, 12 high, 16 moderate, 4 low). To find out more, visit:
+remote:      https://github.com/OkeyAmy/forge/security/dependabot
+remote: 
+To https://github.com/OkeyAmy/forge.git
+   efed0dc..812f196  main -> main
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ cat .cursor/mcp.json | jq .
+cat: .cursor/mcp.json: No such file or directory
+Command 'jq' not found, but can be installed with:
+sudo apt install jq
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ sudo apt-get install jq 
+[sudo] password for okey:       
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages were automatically installed and are no longer required:
+  libid3tag0 libimlib2t64 liblua5.3-0 libmikmod3 vim-runtime
+Use 'sudo apt autoremove' to remove them.
+The following additional packages will be installed:
+  libjq1 libonig5
+The following NEW packages will be installed:
+  jq libjq1 libonig5
+0 upgraded, 3 newly installed, 0 to remove and 462 not upgraded.
+Need to get 379 kB of archives.
+After this operation, 1,125 kB of additional disk space will be used.
+Do you want to continue? [Y/n] Y
+Get:1 http://archive.ubuntu.com/ubuntu noble/main amd64 libonig5 amd64 6.9.9-1build1 [172 kB]
+Get:2 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 libjq1 amd64 1.7.1-3ubuntu0.24.04.1 [141 kB]
+Get:3 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 jq amd64 1.7.1-3ubuntu0.24.04.1 [65.7 kB]
+Fetched 379 kB in 12s (32.0 kB/s)
+Selecting previously unselected package libonig5:amd64.
+(Reading database ... 673882 files and directories currently installed.)
+Preparing to unpack .../libonig5_6.9.9-1build1_amd64.deb ...
+Unpacking libonig5:amd64 (6.9.9-1build1) ...
+Selecting previously unselected package libjq1:amd64.
+Preparing to unpack .../libjq1_1.7.1-3ubuntu0.24.04.1_amd64.deb ...
+Unpacking libjq1:amd64 (1.7.1-3ubuntu0.24.04.1) ...
+Selecting previously unselected package jq.
+Preparing to unpack .../jq_1.7.1-3ubuntu0.24.04.1_amd64.deb ...
+Unpacking jq (1.7.1-3ubuntu0.24.04.1) ...
+Setting up libonig5:amd64 (6.9.9-1build1) ...
+Setting up libjq1:amd64 (1.7.1-3ubuntu0.24.04.1) ...
+Setting up jq (1.7.1-3ubuntu0.24.04.1) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+Processing triggers for libc-bin (2.39-0ubuntu8.6) ...
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ cat .cursor/mcp.json | jq .
+cat: .cursor/mcp.json: No such file or directory
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ cat ~/.cursor/mcp.json | jq .
+{
+  "mcpServers": {
+    "skillforge": {
+      "url": "http://localhost:3001/sse"
+    },
+    "TestSprite": {
+      "command": "npx",
+      "args": [
+        "@testsprite/testsprite-mcp@latest"
+      ],
+      "env": {
+        "API_KEY": "sk-user-c_dJ-x7K0p7sc5YdnD_U8CBAexAYclEYeOU3u2kY1loCMtKpxi691BV6Pj_8CH8jEUh6lM7qPSRxpiI34n5AK5qTqmqifXnvQYHfcnCxSSbxSXkUEdS0WfDKFPg-KL23ftA"
+      }
+    }
+  }
+}
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ cargo run -p forge-api
+   Compiling num-traits v0.2.19
+   Compiling iana-time-zone v0.1.65
+   Compiling chrono v0.4.44
+   Compiling forge-api v0.1.0 (/home/okey/Desktop/Projects/agent-challenge/examples/SWEagent/crates/forge-api)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.96s
+     Running `target/debug/forge-api`
+
+thread 'main' (641422) panicked at crates/forge-api/src/main.rs:31:10:
+Path segments must not start with `:`. For capture groups, use `{capture}`. If you meant to literally match a segment starting with a colon, call `without_v07_checks` on the router.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ cargo run -p forge-api
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running `target/debug/forge-api`
+
+thread 'main' (641946) panicked at crates/forge-api/src/main.rs:31:10:
+Path segments must not start with `:`. For capture groups, use `{capture}`. If you meant to literally match a segment starting with a colon, call `without_v07_checks` on the router.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ cargo run -p forge-api
+   Compiling forge-api v0.1.0 (/home/okey/Desktop/Projects/agent-challenge/examples/SWEagent/crates/forge-api)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.95s
+     Running `target/debug/forge-api`
+
+thread 'main' (642584) panicked at crates/forge-api/src/main.rs:50:29:
+Failed to bind 0.0.0.0:5000: Address already in use (os error 98)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ lsof 
+lsof: WARNING: can't stat() overlay file system /var/lib/docker/overlay2/28df607a7a9f08f906d1aa133d955d27290d74e68748fbdeb1010faf8de9d880/merged
+      Output information may be incomplete.
+lsof: WARNING: can't stat() overlay file system /var/lib/docker/overlay2/232110d67644d63f6dd29f4684f643fa9a7d4ab3d70526451b7ea9020d8adf3d/merged
+      Output information may be incomplete.
+lsof: WARNING: can't stat() overlay file system /var/lib/docker/overlay2/66be45fabed90ebab0c3634ff051c28e74cdafee38c2d3f29484fa7b7d0c19ee/merged
+      Output information may be incomplete.
+lsof: WARNING: can't stat() nsfs file system /run/docker/netns/b5b9544d5719
+      Output information may be incomplete.
+lsof: WARNING: can't stat() nsfs file system /run/docker/netns/dbd750a4902f
+      Output information may be incomplete.
+lsof: WARNING: can't stat() nsfs file system /run/docker/netns/7a5b96c450de
+      Output information may be incomplete.
+lsof: WARNING: can't stat() overlay file system /var/lib/docker/overlay2/8cb817ca841c7bca9064fb006b4550853594179b80bc9b5977b347be5a9366e7/merged
+      Output information may be incomplete.
+lsof: WARNING: can't stat() nsfs file system /run/docker/netns/7eb1c089bc9b
+      Output information may be incomplete.
+lsof: WARNING: can't stat() overlay file system /var/lib/docker/overlay2/a7280660ebfdb63325cb6dd4afcc2e3576ed1a33d6950d9de7813516ec0e0f02/merged
+      Output information may be incomplete.
+lsof: WARNING: can't stat() nsfs file system /run/docker/netns/b3faff18c327
+      Output information may be incomplete.
+^C
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ lsof -5000
+lsof: illegal option character: 5
+lsof: illegal option character: 0
+lsof: illegal option character: 0
+lsof: illegal option character: 0
+lsof 4.95.0
+ latest revision: https://github.com/lsof-org/lsof
+ latest FAQ: https://github.com/lsof-org/lsof/blob/master/00FAQ
+ latest (non-formatted) man page: https://github.com/lsof-org/lsof/blob/master/Lsof.8
+ usage: [-?abhKlnNoOPRtUvVX] [+|-c c] [+|-d s] [+D D] [+|-E] [+|-e s] [+|-f[gG]]
+ [-F [f]] [-g [s]] [-i [i]] [+|-L [l]] [+m [m]] [+|-M] [-o [o]] [-p s]
+ [+|-r [t]] [-s [p:s]] [-S [t]] [-T [t]] [-u s] [+|-w] [-x [fl]] [--] [names]
+Use the ``-h'' option to get more help information.
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ lsof --5000
+lsof: illegal option character: -
+lsof: illegal option character: 5
+lsof: illegal option character: 0
+lsof: illegal option character: 0
+lsof: illegal option character: 0
+lsof 4.95.0
+ latest revision: https://github.com/lsof-org/lsof
+ latest FAQ: https://github.com/lsof-org/lsof/blob/master/00FAQ
+ latest (non-formatted) man page: https://github.com/lsof-org/lsof/blob/master/Lsof.8
+ usage: [-?abhKlnNoOPRtUvVX] [+|-c c] [+|-d s] [+D D] [+|-E] [+|-e s] [+|-f[gG]]
+ [-F [f]] [-g [s]] [-i [i]] [+|-L [l]] [+m [m]] [+|-M] [-o [o]] [-p s]
+ [+|-r [t]] [-s [p:s]] [-S [t]] [-T [t]] [-u s] [+|-w] [-x [fl]] [--] [names]
+Use the ``-h'' option to get more help information.
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ lsof as
+lsof: WARNING: can't stat() overlay file system /var/lib/docker/overlay2/28df607a7a9f08f906d1aa133d955d27290d74e68748fbdeb1010faf8de9d880/merged
+      Output information may be incomplete.
+lsof: WARNING: can't stat() overlay file system /var/lib/docker/overlay2/232110d67644d63f6dd29f4684f643fa9a7d4ab3d70526451b7ea9020d8adf3d/merged
+      Output information may be incomplete.
+lsof: WARNING: can't stat() overlay file system /var/lib/docker/overlay2/66be45fabed90ebab0c3634ff051c28e74cdafee38c2d3f29484fa7b7d0c19ee/merged
+      Output information may be incomplete.
+lsof: WARNING: can't stat() nsfs file system /run/docker/netns/b5b9544d5719
+      Output information may be incomplete.
+lsof: WARNING: can't stat() nsfs file system /run/docker/netns/dbd750a4902f
+      Output information may be incomplete.
+lsof: WARNING: can't stat() nsfs file system /run/docker/netns/7a5b96c450de
+      Output information may be incomplete.
+lsof: WARNING: can't stat() overlay file system /var/lib/docker/overlay2/8cb817ca841c7bca9064fb006b4550853594179b80bc9b5977b347be5a9366e7/merged
+      Output information may be incomplete.
+lsof: WARNING: can't stat() nsfs file system /run/docker/netns/7eb1c089bc9b
+      Output information may be incomplete.
+lsof: WARNING: can't stat() overlay file system /var/lib/docker/overlay2/a7280660ebfdb63325cb6dd4afcc2e3576ed1a33d6950d9de7813516ec0e0f02/merged
+      Output information may be incomplete.
+lsof: WARNING: can't stat() nsfs file system /run/docker/netns/b3faff18c327
+      Output information may be incomplete.
+lsof: status error on as: No such file or directory
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ lsof --help
+lsof: illegal option character: -
+lsof: -e not followed by a file system path: "lp"
+lsof 4.95.0
+ latest revision: https://github.com/lsof-org/lsof
+ latest FAQ: https://github.com/lsof-org/lsof/blob/master/00FAQ
+ latest (non-formatted) man page: https://github.com/lsof-org/lsof/blob/master/Lsof.8
+ usage: [-?abhKlnNoOPRtUvVX] [+|-c c] [+|-d s] [+D D] [+|-E] [+|-e s] [+|-f[gG]]
+ [-F [f]] [-g [s]] [-i [i]] [+|-L [l]] [+m [m]] [+|-M] [-o [o]] [-p s]
+ [+|-r [t]] [-s [p:s]] [-S [t]] [-T [t]] [-u s] [+|-w] [-x [fl]] [--] [names]
+Defaults in parentheses; comma-separated set (s) items; dash-separated ranges.
+  -?|-h list help          -a AND selections (OR)     -b avoid kernel blocks
+  -c c  cmd c ^c /c/[bix]  +c w  COMMAND width (9)    +d s  dir s files
+  -d s  select by FD set   +D D  dir D tree *SLOW?*   +|-e s  exempt s *RISKY*
+  -i select IPv[46] files  -K [i] list|(i)gn tasKs    -l list UID numbers
+  -n no host names         -N select NFS files        -o list file offset
+  -O no overhead *RISKY*   -P no port names           -Q allow failed search
+  -R list paRent PID       -s list file size          -t terse listing
+  -T disable TCP/TPI info  -U select Unix socket      -v list version info
+  -V verbose search        +|-w  Warnings (+)         -X skip TCP&UDP* files
+  -Z Z  context [Z]        -- end option scan       
+  -E display endpoint info              +E display endpoint info and files
+  +f|-f  +filesystem or -file names     +|-f[gG] flaGs 
+  -F [f] select fields; -F? for help  
+  +|-L [l] list (+) suppress (-) link counts < l (0 = all; default = 0)
+                                        +m [m] use|create mount supplement
+  +|-M   portMap registration (-)       -o o   o 0t offset digits (8)
+  -p s   exclude(^)|select PIDs         -S [t] t second stat timeout (15)
+  -T fqs TCP/TPI Fl,Q,St (s) info
+  -g [s] exclude(^)|select and print process group IDs
+  -i i   select by IPv[46] address: [46][proto][@host|addr][:svc_list|port_list]
+  +|-r [t[m<fmt>]] repeat every t seconds (15);  + until no files, - forever.
+       An optional suffix to t is m<fmt>; m must separate t from <fmt> and
+      <fmt> is an strftime(3) format for the marker line.
+  -s p:s  exclude(^)|select protocol (p = TCP|UDP) states by name(s).
+  -u s   exclude(^)|select login|UID set s
+  -x [fl] cross over +d|+D File systems or symbolic Links
+  names  select named files or files on named file systems
+Anyone can list all files; /dev warnings disabled; kernel ID check disabled.
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ lsof -help
+lsof: -e not followed by a file system path: "lp"
+lsof 4.95.0
+ latest revision: https://github.com/lsof-org/lsof
+ latest FAQ: https://github.com/lsof-org/lsof/blob/master/00FAQ
+ latest (non-formatted) man page: https://github.com/lsof-org/lsof/blob/master/Lsof.8
+ usage: [-?abhKlnNoOPRtUvVX] [+|-c c] [+|-d s] [+D D] [+|-E] [+|-e s] [+|-f[gG]]
+ [-F [f]] [-g [s]] [-i [i]] [+|-L [l]] [+m [m]] [+|-M] [-o [o]] [-p s]
+ [+|-r [t]] [-s [p:s]] [-S [t]] [-T [t]] [-u s] [+|-w] [-x [fl]] [--] [names]
+Defaults in parentheses; comma-separated set (s) items; dash-separated ranges.
+  -?|-h list help          -a AND selections (OR)     -b avoid kernel blocks
+  -c c  cmd c ^c /c/[bix]  +c w  COMMAND width (9)    +d s  dir s files
+  -d s  select by FD set   +D D  dir D tree *SLOW?*   +|-e s  exempt s *RISKY*
+  -i select IPv[46] files  -K [i] list|(i)gn tasKs    -l list UID numbers
+  -n no host names         -N select NFS files        -o list file offset
+  -O no overhead *RISKY*   -P no port names           -Q allow failed search
+  -R list paRent PID       -s list file size          -t terse listing
+  -T disable TCP/TPI info  -U select Unix socket      -v list version info
+  -V verbose search        +|-w  Warnings (+)         -X skip TCP&UDP* files
+  -Z Z  context [Z]        -- end option scan       
+  -E display endpoint info              +E display endpoint info and files
+  +f|-f  +filesystem or -file names     +|-f[gG] flaGs 
+  -F [f] select fields; -F? for help  
+  +|-L [l] list (+) suppress (-) link counts < l (0 = all; default = 0)
+                                        +m [m] use|create mount supplement
+  +|-M   portMap registration (-)       -o o   o 0t offset digits (8)
+  -p s   exclude(^)|select PIDs         -S [t] t second stat timeout (15)
+  -T fqs TCP/TPI Fl,Q,St (s) info
+  -g [s] exclude(^)|select and print process group IDs
+  -i i   select by IPv[46] address: [46][proto][@host|addr][:svc_list|port_list]
+  +|-r [t[m<fmt>]] repeat every t seconds (15);  + until no files, - forever.
+       An optional suffix to t is m<fmt>; m must separate t from <fmt> and
+      <fmt> is an strftime(3) format for the marker line.
+  -s p:s  exclude(^)|select protocol (p = TCP|UDP) states by name(s).
+  -u s   exclude(^)|select login|UID set s
+  -x [fl] cross over +d|+D File systems or symbolic Links
+  names  select named files or files on named file systems
+Anyone can list all files; /dev warnings disabled; kernel ID check disabled.
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ lsof --5000
+lsof: illegal option character: -
+lsof: illegal option character: 5
+lsof: illegal option character: 0
+lsof: illegal option character: 0
+lsof: illegal option character: 0
+lsof 4.95.0
+ latest revision: https://github.com/lsof-org/lsof
+ latest FAQ: https://github.com/lsof-org/lsof/blob/master/00FAQ
+ latest (non-formatted) man page: https://github.com/lsof-org/lsof/blob/master/Lsof.8
+ usage: [-?abhKlnNoOPRtUvVX] [+|-c c] [+|-d s] [+D D] [+|-E] [+|-e s] [+|-f[gG]]
+ [-F [f]] [-g [s]] [-i [i]] [+|-L [l]] [+m [m]] [+|-M] [-o [o]] [-p s]
+ [+|-r [t]] [-s [p:s]] [-S [t]] [-T [t]] [-u s] [+|-w] [-x [fl]] [--] [names]
+Use the ``-h'' option to get more help information.
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ cargo run -p forge-api
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running `target/debug/forge-api`
+2026-04-15T14:07:16.588393Z  INFO forge_api: forge-api listening on 0.0.0.0:5000
+^C
+okey@okey-HP-EliteBook-840-G6:~/Desktop/Projects/agent-challenge/examples/SWEagent$ cargo run -p forge-api
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.14s
+     Running `target/debug/forge-api`
+2026-04-15T14:17:56.316688Z  INFO forge_api: forge-api listening on 0.0.0.0:5000
+2026-04-15T14:21:58.910376Z DEBUG request{method=GET uri=/ version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:21:58.910557Z DEBUG request{method=GET uri=/ version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=404
+2026-04-15T14:22:17.302191Z DEBUG request{method=POST uri=/api/run version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:17.371250Z DEBUG request{method=POST uri=/api/run version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=69 ms status=500
+2026-04-15T14:22:17.371316Z ERROR request{method=POST uri=/api/run version=HTTP/1.1}: tower_http::trace::on_failure: response failed classification=Status code: 500 Internal Server Error latency=69 ms
+2026-04-15T14:22:18.792692Z DEBUG request{method=POST uri=/api/run/batch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:18.908222Z DEBUG request{method=POST uri=/api/run/batch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=115 ms status=200
+2026-04-15T14:22:20.405354Z DEBUG request{method=POST uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:20.405698Z DEBUG request{method=POST uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:22:21.868581Z DEBUG request{method=POST uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:21.868986Z DEBUG request{method=POST uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=409
+2026-04-15T14:22:23.110229Z DEBUG request{method=GET uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:23.110370Z DEBUG request{method=GET uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:22:24.516350Z DEBUG request{method=DELETE uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:24.516700Z DEBUG request{method=DELETE uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:22:25.813262Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:25.814351Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=1 ms status=200
+2026-04-15T14:22:27.371169Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:27.372670Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=1 ms status=200
+2026-04-15T14:22:28.815667Z DEBUG request{method=GET uri=/api/trajectories/OkeyAmy__Axioschat-Onboard-i25.traj?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:28.818562Z DEBUG request{method=GET uri=/api/trajectories/OkeyAmy__Axioschat-Onboard-i25.traj?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=2 ms status=200
+2026-04-15T14:22:30.432260Z DEBUG request{method=GET uri=/api/stats?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:30.432945Z DEBUG request{method=GET uri=/api/stats?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:22:31.752863Z DEBUG request{method=GET uri=/api/stats?dir=missing_dir version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:31.753147Z DEBUG request{method=GET uri=/api/stats?dir=missing_dir version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=404
+2026-04-15T14:22:34.515271Z DEBUG request{method=GET uri=/api/issues?repo=octocat%2FHello-World&limit=5 version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:35.601420Z DEBUG request{method=GET uri=/api/issues?repo=octocat%2FHello-World&limit=5 version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=1086 ms status=200
+2026-04-15T14:22:41.118685Z DEBUG request{method=GET uri=/api/stats?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:41.119279Z DEBUG request{method=GET uri=/api/stats?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:22:42.474294Z DEBUG request{method=GET uri=/api/stats?dir=missing_dir version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:42.474407Z DEBUG request{method=GET uri=/api/stats?dir=missing_dir version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=404
+2026-04-15T14:22:43.926382Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:43.927638Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=1 ms status=200
+2026-04-15T14:22:45.976470Z DEBUG request{method=POST uri=/api/run/batch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:46.054599Z DEBUG request{method=POST uri=/api/run/batch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=78 ms status=200
+2026-04-15T14:22:47.759333Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:47.760609Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=1 ms status=200
+2026-04-15T14:22:49.464468Z DEBUG request{method=POST uri=/api/run/batch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:49.464713Z DEBUG request{method=POST uri=/api/run/batch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=422
+2026-04-15T14:22:51.034108Z DEBUG request{method=GET uri=/api/issues?repo=octocat%2FHello-World&limit=5 version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:51.880136Z DEBUG request{method=GET uri=/api/issues?repo=octocat%2FHello-World&limit=5 version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=846 ms status=200
+2026-04-15T14:22:53.688003Z DEBUG request{method=POST uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:53.688192Z DEBUG request{method=POST uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:22:54.950166Z DEBUG request{method=POST uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:54.950372Z DEBUG request{method=POST uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=409
+2026-04-15T14:22:56.462826Z DEBUG request{method=GET uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:56.462971Z DEBUG request{method=GET uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:22:58.371476Z DEBUG request{method=DELETE uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:58.371663Z DEBUG request{method=DELETE uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:22:59.864243Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:22:59.864961Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:23:01.647941Z DEBUG request{method=GET uri=/api/trajectories/OkeyAmy__Axioschat-Onboard-i25.traj?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:23:01.649920Z DEBUG request{method=GET uri=/api/trajectories/OkeyAmy__Axioschat-Onboard-i25.traj?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=2 ms status=200
+2026-04-15T14:23:03.376350Z DEBUG request{method=GET uri=/api/stats?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:23:03.376964Z DEBUG request{method=GET uri=/api/stats?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:23:04.821534Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:23:04.822235Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:23:06.343863Z DEBUG request{method=GET uri=/health version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:23:06.343995Z DEBUG request{method=GET uri=/health version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:23:14.945978Z DEBUG request{method=GET uri=/api/issues?repo=octocat%2FHello-World&limit=5 version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:23:16.084837Z DEBUG request{method=GET uri=/api/issues?repo=octocat%2FHello-World&limit=5 version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=1138 ms status=200
+2026-04-15T14:23:19.054120Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:23:19.055220Z DEBUG request{method=GET uri=/api/trajectories?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=1 ms status=200
+2026-04-15T14:23:20.477897Z DEBUG request{method=GET uri=/api/trajectories/OkeyAmy__Axioschat-Onboard-i25.traj?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:23:20.480387Z DEBUG request{method=GET uri=/api/trajectories/OkeyAmy__Axioschat-Onboard-i25.traj?dir=trajectories version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=2 ms status=200
+2026-04-15T14:23:22.677332Z DEBUG request{method=POST uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:23:22.677868Z DEBUG request{method=POST uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:23:23.996879Z DEBUG request{method=POST uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:23:23.997041Z DEBUG request{method=POST uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=409
+2026-04-15T14:23:25.801625Z DEBUG request{method=GET uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:23:25.801742Z DEBUG request{method=GET uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200
+2026-04-15T14:23:27.239886Z DEBUG request{method=DELETE uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_request: started processing request
+2026-04-15T14:23:27.240126Z DEBUG request{method=DELETE uri=/api/watch version=HTTP/1.1}: tower_http::trace::on_response: finished processing request latency=0 ms status=200

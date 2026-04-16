@@ -1,0 +1,19 @@
+{
+  "status": "commited",
+  "type": "backend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:5000",
+  "backendAuthType": "public",
+  "executionArgs": {
+    "projectName": "SWEagent",
+    "projectPath": "/home/okey/Desktop/Projects/agent-challenge/examples/SWEagent",
+    "testIds": [],
+    "additionalInstruction": "forge-api must be running on port 5000. Tests target only registered routes in crates/forge-api/src/main.rs. Expect: GET /health 200; GET /api/stats and GET /api/trajectories with dir=trajectories; GET /api/issues excludes GitHub pull requests (issues-only); POST /api/run/batch malformed bodies return 400 not 422; DELETE /api/watch returns running false with repo label started_at null; trajectory list uses string exit_status (may be empty). Restart forge-api after code changes before tunnel run.",
+    "serverMode": "development",
+    "envs": {
+      "API_KEY": "sk-user-FBu-VtjZ0dbA6ujBpXVc_PlFXF_Egc7_5I98XUPxrPyN32Z2j7e7JZTKUQ59NxFmFjNFVMhJJ-PPw4mwZ3l2jJrHQ08o7ct_qJXMQ0azKd0HHGbAVm64SR8taS-ha2fKieg"
+    }
+  },
+  "serverPort": 40605,
+  "proxy": "http://c085d4b7-9613-48ea-ba3a-d4ba4410d757:luXwkRvCblMe91hyeu9fJQ7PimUQU4wv@tun.testsprite.com:8080"
+}

@@ -58,5 +58,6 @@ examples/trajectories
 
 # TestSprite local/runtime artifacts
 testsprite_tests/.venv/
-testsprite_tests/logs/
-testsprite_tests/tmp/
+# testsprite_tests/logs/
+# testsprite_tests/tmp/
+SUBMISSION.md

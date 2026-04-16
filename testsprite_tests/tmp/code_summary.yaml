@@ -1,0 +1,118 @@
+version: "2"
+type: backend
+tech_stack:
+  - Rust
+  - Axum 0.8
+  - Tokio
+  - serde / serde_json
+  - Docker (via forge-run / bollard for agent runs)
+features:
+  - name: Forge API HTTP surface
+    description: REST API wrapping the Forge autonomous coding agent (run, batch, GitHub issues, trajectories, stats, watch).
+    files:
+      - crates/forge-api/src/main.rs
+      - crates/forge-api/src/routes/health.rs
+      - crates/forge-api/src/routes/run.rs
+      - crates/forge-api/src/routes/issues.rs
+      - crates/forge-api/src/routes/stats.rs
+      - crates/forge-api/src/routes/trajectories.rs
+      - crates/forge-api/src/routes/watch.rs
+    depends_on:
+      - Local forge-api server (default port 5000)
+      - Optional GITHUB_TOKEN for /api/issues and watch
+    endpoints:
+      - method: GET
+        path: /health
+        description: Liveness probe; returns status ok and crate version
+        auth_required: false
+        response_schema:
+          "200": "{ status: string, version: string }"
+      - method: POST
+        path: /api/run
+        description: Run Forge agent once on a GitHub issue or problem_text; long-running
+        auth_required: false
+        request_schema:
+          body:
+            github_url: string (optional)
+            repo: string (optional)
+            issue: number (optional)
+            problem_text: string (optional)
+            output_dir: string (optional)
+            agent: object (optional)
+            env: object (optional)
+        response_schema:
+          "200": "{ exit_status, has_submission, submission_preview, steps, model_stats, trajectory_file }"
+          "400": error message string
+          "500": error message string
+      - method: POST
+        path: /api/run/batch
+        description: Parallel agent runs for multiple items
+        auth_required: false
+        request_schema:
+          body:
+            items: array
+            output_dir: string (optional)
+            workers: number (optional)
+        response_schema:
+          "200": "{ output_dir, total, succeeded, failed, results[] }"
+      - method: GET
+        path: /api/issues
+        description: List open GitHub issues for owner/repo; uses GITHUB_TOKEN env when set
+        auth_required: false
+        response_schema:
+          "200": "{ repo, count, issues[] }"
+          "502": GitHub API error
+      - method: GET
+        path: /api/trajectories
+        description: List .traj files in dir with metadata
+        auth_required: false
+        response_schema:
+          "200": "{ directory, count, trajectories[] }"
+          "404": directory missing
+      - method: GET
+        path: /api/trajectories/{name}
+        description: Full TrajFile JSON for one trajectory file
+        auth_required: false
+        response_schema:
+          "200": TrajFile
+          "404": not found
+          "422": parse error
+      - method: GET
+        path: /api/stats
+        description: Aggregate exit_status counts over .traj files in directory
+        auth_required: false
+        response_schema:
+          "200": "{ directory, total, submitted, forfeited, errors, step_limit_reached, other }"
+          "404": directory missing
+      - method: POST
+        path: /api/watch
+        description: Start background GitHub label watcher (one at a time)
+        auth_required: false
+        request_schema:
+          body:
+            repo: string
+            label: string (optional)
+            interval: number (optional)
+        response_schema:
+          "200": "{ running, repo, label, started_at }"
+          "409": watch already running
+      - method: GET
+        path: /api/watch
+        description: Watch task status
+        auth_required: false
+        response_schema:
+          "200": "{ running, repo, label, started_at }"
+      - method: DELETE
+        path: /api/watch
+        description: Stop watch task
+        auth_required: false
+        response_schema:
+          "200": stopped status object
+          "404": no task running
+known_limitations:
+  - issue: POST /api/run and batch require Docker, model API keys, and can take many minutes
+    location: crates/forge-run
+    impact: Integration tests should focus on fast endpoints unless environment is fully provisioned
+  - issue: /api/issues returns 502 for invalid repos or rate limits without token
+    location: crates/forge-api/src/routes/issues.rs
+    impact: Tests should use a known public repo or skip when GitHub unavailable
