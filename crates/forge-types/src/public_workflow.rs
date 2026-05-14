@@ -42,7 +42,10 @@ impl ForgeCommand {
     }
 
     pub fn requires_pr_context(&self) -> bool {
-        matches!(self, Self::Review | Self::Improve | Self::Ask { .. } | Self::Fix)
+        matches!(
+            self,
+            Self::Review | Self::Improve | Self::Ask { .. } | Self::Fix
+        )
     }
 }
 
@@ -101,6 +104,34 @@ pub struct ForgeGitHubEvent {
     pub actor: GitHubActor,
     pub subject: GitHubSubject,
     pub command: ForgeCommand,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ForgeJob {
+    pub id: String,
+    pub state: ForgeJobState,
+    pub event: ForgeGitHubEvent,
+    pub created_at_unix_secs: u64,
+    pub updated_at_unix_secs: u64,
+    pub plan: Option<ForgePlan>,
+    pub branch_name: Option<String>,
+    pub error: Option<String>,
+}
+
+impl ForgeJob {
+    pub fn issue_number(&self) -> Option<u64> {
+        match &self.event.subject {
+            GitHubSubject::Issue { number, .. } => Some(*number),
+            GitHubSubject::PullRequest { .. } => None,
+        }
+    }
+
+    pub fn pull_request_number(&self) -> Option<u64> {
+        match &self.event.subject {
+            GitHubSubject::Issue { .. } => None,
+            GitHubSubject::PullRequest { number, .. } => Some(*number),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -176,7 +207,10 @@ pub fn render_branch_ready_comment(
             .iter()
             .map(|check| {
                 let status = if check.passed { "passed" } else { "failed" };
-                format!("- `{}`: {} (exit {})", check.command, status, check.exit_code)
+                format!(
+                    "- `{}`: {} (exit {})",
+                    check.command, status, check.exit_code
+                )
             })
             .collect::<Vec<_>>()
             .join("\n")
@@ -216,15 +250,30 @@ mod tests {
     #[test]
     fn parse_issue_commands() {
         assert_eq!(ForgeCommand::parse("/forge plan"), Some(ForgeCommand::Plan));
-        assert_eq!(ForgeCommand::parse("/forge approve"), Some(ForgeCommand::Approve));
-        assert_eq!(ForgeCommand::parse("/forge status"), Some(ForgeCommand::Status));
-        assert_eq!(ForgeCommand::parse("/forge cancel"), Some(ForgeCommand::Cancel));
+        assert_eq!(
+            ForgeCommand::parse("/forge approve"),
+            Some(ForgeCommand::Approve)
+        );
+        assert_eq!(
+            ForgeCommand::parse("/forge status"),
+            Some(ForgeCommand::Status)
+        );
+        assert_eq!(
+            ForgeCommand::parse("/forge cancel"),
+            Some(ForgeCommand::Cancel)
+        );
     }
 
     #[test]
     fn parse_pr_commands() {
-        assert_eq!(ForgeCommand::parse("/forge review"), Some(ForgeCommand::Review));
-        assert_eq!(ForgeCommand::parse("/forge improve"), Some(ForgeCommand::Improve));
+        assert_eq!(
+            ForgeCommand::parse("/forge review"),
+            Some(ForgeCommand::Review)
+        );
+        assert_eq!(
+            ForgeCommand::parse("/forge improve"),
+            Some(ForgeCommand::Improve)
+        );
         assert_eq!(ForgeCommand::parse("/forge fix"), Some(ForgeCommand::Fix));
         assert_eq!(
             ForgeCommand::parse("/forge ask why did this fail?"),
@@ -286,6 +335,8 @@ mod tests {
 
         assert!(rendered.contains("## Forge Branch Ready"));
         assert!(rendered.contains("cargo test --workspace"));
-        assert!(rendered.contains("https://github.com/acme/app/compare/main...forge/issue-8-fix-api"));
+        assert!(
+            rendered.contains("https://github.com/acme/app/compare/main...forge/issue-8-fix-api")
+        );
     }
 }

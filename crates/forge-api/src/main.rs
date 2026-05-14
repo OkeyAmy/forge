@@ -1,7 +1,12 @@
 mod github_app_auth;
+mod job_store;
 mod routes;
+mod workflow;
 
-use axum::{Router, routing::{get, post}};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
@@ -15,14 +20,19 @@ async fn main() {
         )
         .init();
 
+    let jobs = job_store::FileJobStore::from_env();
+    let queue = workflow::start_worker(jobs.clone());
+    let state = workflow::AppState { jobs, queue };
+
     let app = Router::new()
+        .route("/", get(routes::setup::handler))
         .route("/health", get(routes::health::handler))
         .route("/api/github/webhook", post(routes::github_app::handler))
         .route("/api/run", post(routes::run::handler))
         .route("/api/issues", get(routes::issues::handler))
-        .route("/api/stats", get(routes::stats::handler))
         .layer(CorsLayer::permissive())
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        .with_state(state);
 
     let port = std::env::var("FORGE_API_PORT")
         .ok()
@@ -35,7 +45,5 @@ async fn main() {
         .unwrap_or_else(|e| panic!("Failed to bind {addr}: {e}"));
 
     tracing::info!("forge-api listening on {addr}");
-    axum::serve(listener, app)
-        .await
-        .expect("server error");
+    axum::serve(listener, app).await.expect("server error");
 }

@@ -32,6 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
     git \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
@@ -39,9 +41,10 @@ RUN useradd -m -u 1000 forge
 
 # Copy the compiled binary
 COPY --from=builder /build/target/release/${BIN} /usr/local/bin/${BIN}
+COPY scripts/e2b-runner /home/forge/scripts/e2b-runner
+RUN cd /home/forge/scripts/e2b-runner && npm install --omit=dev && chown -R forge:forge /home/forge/scripts
 
-# Trajectories will be written here — mount a volume over it
-RUN mkdir -p /trajectories && chown forge:forge /trajectories
+RUN mkdir -p /data/forge && chown forge:forge /data/forge
 
 USER forge
 WORKDIR /home/forge

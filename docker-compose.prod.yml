@@ -13,7 +13,7 @@ services:
       GITHUB_APP_PRIVATE_KEY_PATH: /run/secrets/github-app.pem
     volumes:
       - ./secrets/github-app.pem:/run/secrets/github-app.pem:ro
-      - ./trajectories:/trajectories
+      - forge_data:/data/forge
     restart: unless-stopped
 
   caddy:
@@ -34,3 +34,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  forge_data:

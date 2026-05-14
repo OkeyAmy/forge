@@ -123,6 +123,43 @@ impl GitHubAppClient {
             .map_err(|e| ForgeError::Http(e.to_string()))
     }
 
+    pub async fn list_pull_request_files(
+        &self,
+        installation_id: u64,
+        owner: &str,
+        repo: &str,
+        pull_number: u64,
+    ) -> Result<Vec<GitHubPullRequestFile>, ForgeError> {
+        let token = self.installation_token(installation_id).await?;
+        let url = format!(
+            "{}/repos/{owner}/{repo}/pulls/{pull_number}/files",
+            self.config.api_base_url.trim_end_matches('/')
+        );
+        let response = self
+            .client
+            .get(url)
+            .header(USER_AGENT, "Forge")
+            .header(ACCEPT, "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .bearer_auth(token)
+            .send()
+            .await
+            .map_err(|e| ForgeError::Http(e.to_string()))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(ForgeError::Http(format!(
+                "GitHub pull request files request failed {status}: {body}"
+            )));
+        }
+
+        response
+            .json::<Vec<GitHubPullRequestFile>>()
+            .await
+            .map_err(|e| ForgeError::Http(e.to_string()))
+    }
+
     fn app_jwt(&self) -> Result<String, ForgeError> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -155,4 +192,13 @@ struct InstallationTokenResponse {
 #[derive(Debug, Deserialize)]
 pub struct GitHubCommentResponse {
     pub id: u64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GitHubPullRequestFile {
+    pub filename: String,
+    pub status: String,
+    pub additions: u64,
+    pub deletions: u64,
+    pub patch: Option<String>,
 }
