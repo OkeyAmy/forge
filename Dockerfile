@@ -35,7 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
-RUN useradd -m -u 1000 forge
+RUN useradd -m -u 10001 forge
 
 # Copy the compiled binary
 COPY --from=builder /build/target/release/${BIN} /usr/local/bin/${BIN}
