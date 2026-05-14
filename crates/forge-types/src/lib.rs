@@ -3,6 +3,7 @@
 pub mod error;
 pub mod history;
 pub mod model_output;
+pub mod public_workflow;
 pub mod special_tokens;
 pub mod step;
 pub mod trajectory;

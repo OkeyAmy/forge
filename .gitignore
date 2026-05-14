@@ -3,6 +3,7 @@
 
 # Secrets — never commit
 .env
+.env.production
 *.key
 *.pem
 *.p12
@@ -54,3 +55,11 @@ Thumbs.db
 
 .remember/
 testsprint.md
+
+# Local agent/runtime state
+.omx/
+.superpowers/
+
+# External/source-drop experiments
+pr_agent/
+pr-agent/

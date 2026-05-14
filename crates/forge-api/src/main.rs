@@ -1,3 +1,4 @@
+mod github_app_auth;
 mod routes;
 
 use axum::{Router, routing::{get, post}};
@@ -16,6 +17,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/health", get(routes::health::handler))
+        .route("/api/github/webhook", post(routes::github_app::handler))
         .route("/api/run", post(routes::run::handler))
         .route("/api/issues", get(routes::issues::handler))
         .route("/api/stats", get(routes::stats::handler))

@@ -10,6 +10,7 @@
 
 pub mod bash_session;
 pub mod docker;
+pub mod e2b;
 pub mod environment;
 pub mod repo;
 pub(crate) mod utils;
