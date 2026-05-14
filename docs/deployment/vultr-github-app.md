@@ -18,7 +18,7 @@ The current backend can:
 - Post GitHub issue/PR comments with the installation token.
 - Generate a concrete `/forge plan` from issue context and configured checks.
 - Gate `/forge approve` behind the latest waiting issue plan.
-- Run approved jobs through an E2B runner that clones with an installation token, creates a branch, runs `FORGE_E2B_WORK_COMMAND`, runs configured checks, captures changed files, and pushes the branch when a diff exists.
+- Run approved jobs through an E2B runner that clones with an installation token, creates a branch, edits through a model-guided command loop by default, runs configured checks, captures changed files, and pushes the branch when a diff exists.
 - Fetch PR changed files with native GitHub App APIs for `/forge review`.
 - Run a real E2B live smoke test that creates a sandbox and executes a command.
 - Keep legacy `/api/run` disabled in production unless `FORGE_ENABLE_LEGACY_RUN_API=true`.
@@ -31,7 +31,6 @@ Forge is not a complete public product yet. Remaining work:
 - A live test against a real installed test repository.
 - A richer user dashboard for install status, job history, and usage controls.
 - Model-generated issue plans and PR review prose. Current planning/review is deterministic and GitHub-data driven.
-- A default autonomous edit command. `FORGE_E2B_WORK_COMMAND` is intentionally explicit so production does not run arbitrary code-editing behavior without operator control.
 - A distributed queue if you run multiple API replicas. The current queue is in-process with durable file-backed job state.
 - End-to-end live test against a real installed GitHub App and test repo.
 
@@ -48,7 +47,6 @@ GITHUB_APP_ID=your-app-id \
 GITHUB_APP_PRIVATE_KEY_PATH=/absolute/path/to/github-app.pem \
 GITHUB_APP_PUBLIC_URL=https://github.com/apps/your-forge-app/installations/new \
 E2B_API_KEY=your-e2b-key \
-FORGE_E2B_WORK_COMMAND='echo configure-your-repo-specific-edit-command' \
 cargo run -p forge-api
 ```
 
@@ -154,7 +152,9 @@ GITHUB_APP_PUBLIC_URL=https://github.com/apps/your-forge-app/installations/new
 GITHUB_APP_PRIVATE_KEY_PATH=/run/secrets/github-app.pem
 FORGE_JOB_STORE_PATH=/data/forge/jobs.json
 FORGE_PUBLIC_CHECKS=cargo test --workspace
-FORGE_E2B_WORK_COMMAND=...
+FORGE_E2B_MAX_STEPS=6
+# Optional advanced override. Leave empty for the built-in model-guided E2B edit loop.
+FORGE_E2B_WORK_COMMAND=
 FORGE_MODEL=...
 FORGE_BASE_URL=...
 FORGE_API_KEY=...
@@ -226,5 +226,5 @@ After deployment:
 3. Add label `forge`.
 4. Confirm the Forge server logs receive an `issues` webhook.
 5. Confirm Forge posts a plan comment.
-6. Comment `/forge approve` and confirm Forge creates/pushes a `forge/issue-N` branch when `FORGE_E2B_WORK_COMMAND` produces a diff.
+6. Comment `/forge approve` and confirm Forge creates/pushes a `forge/issue-N` branch when the E2B model loop produces a diff.
 7. Comment `/forge review` on a PR and confirm Forge posts a native changed-file review comment.

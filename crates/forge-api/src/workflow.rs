@@ -401,6 +401,8 @@ struct E2bRunnerInput {
     branch_name: String,
     installation_token: String,
     work_command: Option<String>,
+    model: Option<E2bModelInput>,
+    max_steps: u32,
     checks: Vec<String>,
 }
 
@@ -417,6 +419,13 @@ struct E2bIssueInput {
     number: u64,
     title: String,
     body: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+struct E2bModelInput {
+    base_url: String,
+    api_key: String,
+    model: String,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -478,6 +487,11 @@ async fn run_e2b_job(
         work_command: std::env::var("FORGE_E2B_WORK_COMMAND")
             .ok()
             .filter(|value| !value.trim().is_empty()),
+        model: e2b_model_from_env(),
+        max_steps: std::env::var("FORGE_E2B_MAX_STEPS")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(6),
         checks: plan
             .map(|plan| plan.checks.clone())
             .unwrap_or_else(configured_checks),
@@ -512,6 +526,20 @@ async fn run_e2b_runner_with_json(input_json: &[u8]) -> Result<String, ForgeErro
     }
     String::from_utf8(output.stdout)
         .map_err(|e| ForgeError::Environment(format!("E2B runner emitted invalid UTF-8: {e}")))
+}
+
+fn e2b_model_from_env() -> Option<E2bModelInput> {
+    let base_url = std::env::var("FORGE_BASE_URL").ok()?;
+    let api_key = std::env::var("FORGE_API_KEY").ok()?;
+    let model = std::env::var("FORGE_MODEL").ok()?;
+    if base_url.trim().is_empty() || api_key.trim().is_empty() || model.trim().is_empty() {
+        return None;
+    }
+    Some(E2bModelInput {
+        base_url,
+        api_key,
+        model,
+    })
 }
 
 pub fn parse_e2b_runner_output(stdout: &str) -> Result<E2bRunnerOutput, ForgeError> {
