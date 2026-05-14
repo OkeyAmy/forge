@@ -23,7 +23,7 @@ RUN cargo build --release -p ${BIN}
 # ============================================================
 # Stage 2 — Runtime (minimal)
 # ============================================================
-FROM debian:bookworm-slim AS runtime
+FROM node:20-bookworm-slim AS runtime
 
 ARG BIN=forge
 
@@ -32,8 +32,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
     git \
-    nodejs \
-    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
