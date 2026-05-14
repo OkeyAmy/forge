@@ -53,6 +53,13 @@ pub struct RunResponse {
 pub async fn handler(
     Json(req): Json<RunRequest>,
 ) -> Result<Json<RunResponse>, (StatusCode, String)> {
+    if std::env::var("FORGE_ENABLE_LEGACY_RUN_API").as_deref() != Ok("true") {
+        return Err((
+            StatusCode::NOT_FOUND,
+            "Legacy /api/run is disabled. Use the GitHub App webhook flow.".to_string(),
+        ));
+    }
+
     let config = build_run_config(req)?;
 
     let run = RunSingle::from_run_config(config)

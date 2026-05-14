@@ -14,6 +14,7 @@ The current backend can:
 - Create a GitHub App JWT and exchange it for an installation token.
 - Post GitHub issue/PR comments with the installation token.
 - Run a real E2B live smoke test that creates a sandbox and executes a command.
+- Keep legacy `/api/run` disabled in production unless `FORGE_ENABLE_LEGACY_RUN_API=true`.
 
 ## What Is Still Missing
 
@@ -105,6 +106,12 @@ Create a Vultr server:
 - At least 1 vCPU / 1 GB RAM for early testing
 - Open firewall ports `80` and `443`
 
+For the current test server, the public IP is:
+
+```text
+149.28.121.155
+```
+
 SSH into the server and install Docker if the image does not already include it:
 
 ```bash
@@ -132,6 +139,7 @@ Set these values:
 
 ```dotenv
 FORGE_DOMAIN=forge.yourdomain.com
+FORGE_ENABLE_LEGACY_RUN_API=false
 E2B_API_KEY=...
 GITHUB_WEBHOOK_SECRET=...
 GITHUB_APP_ID=...
@@ -157,7 +165,8 @@ forge.yourdomain.com -> Vultr server public IP
 Start Forge:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+chmod +x scripts/deploy-vultr.sh
+./scripts/deploy-vultr.sh
 ```
 
 Check the API:
@@ -176,13 +185,18 @@ Expected response:
 
 Users connect by installing your GitHub App:
 
-1. Open the public GitHub App installation page.
+1. Open the public GitHub App installation page:
+   ```text
+   https://github.com/apps/<your-forge-app-name>/installations/new
+   ```
 2. Select repositories.
 3. Add the `forge` label to an issue or comment `/forge plan`.
 4. GitHub sends the webhook to Forge.
 5. Forge uses the installation token for that repository.
 
 The user does not need to configure tokens manually.
+
+For a public product, link users to the installation URL from the Forge landing page. The hosted API receives all repository events through installation-scoped tokens, so users do not paste personal access tokens into Forge.
 
 ## Live Test Checklist
 
