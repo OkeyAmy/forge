@@ -115,6 +115,10 @@ pub struct ForgeJob {
     pub updated_at_unix_secs: u64,
     pub plan: Option<ForgePlan>,
     pub branch_name: Option<String>,
+    #[serde(default)]
+    pub pull_request_url: Option<String>,
+    #[serde(default)]
+    pub pull_request_number: Option<u64>,
     pub error: Option<String>,
 }
 
@@ -141,6 +145,7 @@ pub struct ForgePlan {
     pub checks: Vec<String>,
     pub risk: String,
     pub branch_name: String,
+    pub codebase_context: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -167,8 +172,15 @@ pub fn render_plan_comment(plan: &ForgePlan) -> String {
             .join("\n")
     };
 
+    let context_section = plan
+        .codebase_context
+        .as_ref()
+        .map(|ctx| format!("### Codebase Context\n{ctx}\n\n"))
+        .unwrap_or_default();
+
     format!(
         "## Forge Plan\n\n\
+         {context_section}\
          ### What I Think This Issue Needs\n{summary}\n\n\
          ### Proposed Change\n{proposed_change}\n\n\
          ### Checks I Will Run\n{checks}\n\n\
@@ -186,6 +198,7 @@ pub fn render_plan_comment(plan: &ForgePlan) -> String {
 pub fn render_branch_ready_comment(
     branch_name: &str,
     compare_url: &str,
+    pull_request_url: Option<&str>,
     changed_files: &[String],
     verification: &ForgeVerificationSummary,
 ) -> String {
@@ -227,6 +240,10 @@ pub fn render_branch_ready_comment(
             .join("\n")
     };
 
+    let next_step = pull_request_url
+        .map(|url| format!("Forge opened a pull request: {url}"))
+        .unwrap_or_else(|| format!("Open a pull request from `{branch_name}` when the diff looks right."));
+
     format!(
         "## Forge Branch Ready\n\n\
          ### Branch\n`{branch_name}`\n\n\
@@ -234,7 +251,7 @@ pub fn render_branch_ready_comment(
          ### Changed Files\n{files}\n\n\
          ### Verification\n{checks}\n\n\
          ### Risks And Notes\n{risks}\n\n\
-         ### Next Step\nOpen a pull request from `{branch_name}` when the diff looks right.",
+         ### Next Step\n{next_step}",
     )
 }
 
@@ -306,6 +323,7 @@ mod tests {
             checks: vec!["npm test".to_string()],
             risk: "low".to_string(),
             branch_name: "forge/issue-12-login-validation".to_string(),
+            codebase_context: Some("React + TypeScript project with Vite.".to_string()),
         };
 
         let rendered = render_plan_comment(&plan);
@@ -329,6 +347,7 @@ mod tests {
         let rendered = render_branch_ready_comment(
             "forge/issue-8-fix-api",
             "https://github.com/acme/app/compare/main...forge/issue-8-fix-api",
+            Some("https://github.com/acme/app/pull/19"),
             &["src/api.rs".to_string()],
             &verification,
         );
@@ -338,5 +357,6 @@ mod tests {
         assert!(
             rendered.contains("https://github.com/acme/app/compare/main...forge/issue-8-fix-api")
         );
+        assert!(rendered.contains("https://github.com/acme/app/pull/19"));
     }
 }

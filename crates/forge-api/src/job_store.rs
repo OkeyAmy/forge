@@ -39,6 +39,8 @@ impl FileJobStore {
             updated_at_unix_secs: now,
             plan: None,
             branch_name: None,
+            pull_request_url: None,
+            pull_request_number: None,
             error: None,
         };
         jobs.push(job.clone());
@@ -53,6 +55,17 @@ impl FileJobStore {
 
     pub async fn get(&self, id: &str) -> Result<Option<ForgeJob>, ForgeError> {
         Ok(self.all().await?.into_iter().find(|job| job.id == id))
+    }
+
+    pub async fn find_by_delivery_id(
+        &self,
+        delivery_id: &str,
+    ) -> Result<Option<ForgeJob>, ForgeError> {
+        Ok(self
+            .all()
+            .await?
+            .into_iter()
+            .find(|job| job.event.delivery_id == delivery_id))
     }
 
     pub async fn update<F>(&self, id: &str, update: F) -> Result<ForgeJob, ForgeError>
@@ -233,6 +246,23 @@ mod tests {
             .unwrap();
 
         assert_eq!(found.unwrap().id, second.id);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn find_by_delivery_id_returns_existing_job() {
+        let path = test_store_path("delivery");
+        let store = FileJobStore::new(&path);
+        let inserted = store
+            .insert_event(issue_event("delivery-1", ForgeCommand::Plan, 7))
+            .await
+            .unwrap();
+
+        let found = store.find_by_delivery_id("delivery-1").await.unwrap();
+        let missing = store.find_by_delivery_id("delivery-2").await.unwrap();
+
+        assert_eq!(found.unwrap().id, inserted.id);
+        assert!(missing.is_none());
         let _ = std::fs::remove_file(path);
     }
 }

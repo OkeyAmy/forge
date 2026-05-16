@@ -28,6 +28,20 @@ pub async fn handler(
 
     let event_name = header_value(&headers, "x-github-event")?;
     let delivery_id = header_value(&headers, "x-github-delivery")?;
+    if let Some(job) = state
+        .jobs
+        .find_by_delivery_id(delivery_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    {
+        return Ok(Json(GitHubAppWebhookResponse {
+            accepted: true,
+            state: job.state,
+            command: job.event.command,
+            job_id: job.id,
+            message: "Duplicate GitHub delivery ignored; existing Forge job returned.".to_string(),
+        }));
+    }
     let event = normalize_webhook_event(event_name, delivery_id, &body)?;
 
     validate_command_context(&event)?;

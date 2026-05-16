@@ -68,7 +68,22 @@ async fn process_plan_job(
 ) -> Result<(), ForgeError> {
     jobs.update(job_id, |job| job.state = ForgeJobState::Planning)
         .await?;
-    let plan = build_issue_plan(event)?;
+    post_comment_if_configured(
+        event,
+        "## Forge\n\nI am inspecting this repository in an E2B sandbox so I can produce a codebase-aware plan.",
+    )
+    .await?;
+    let plan = match run_e2b_plan_job(event).await {
+        Ok(plan) => plan,
+        Err(error) => {
+            tracing::warn!(%error, "E2B planning failed; falling back to issue-only plan");
+            let mut plan = build_issue_plan(event)?;
+            plan.codebase_context = Some(format!(
+                "Forge could not inspect the repository before planning: {error}. This fallback plan is based on the issue text only."
+            ));
+            plan
+        }
+    };
     post_comment_if_configured(event, &render_plan_comment(&plan)).await?;
     jobs.update(job_id, |job| {
         job.state = ForgeJobState::WaitingForApproval;
@@ -109,6 +124,11 @@ async fn process_approve_job(
         .branch_name
         .clone()
         .unwrap_or_else(|| issue_branch_name(*number));
+    jobs.update(&plan_job.id, |job| {
+        job.state = ForgeJobState::Approved;
+        job.error = None;
+    })
+    .await?;
     jobs.update(job_id, |job| {
         job.state = ForgeJobState::Running;
         job.branch_name = Some(branch.clone());
@@ -117,9 +137,11 @@ async fn process_approve_job(
     .await?;
 
     let output = run_e2b_job(event, &branch, plan_job.plan.as_ref()).await?;
+    let pull_request = create_pull_request_for_output(event, &output).await?;
     let comment = render_branch_ready_comment(
         &output.branch_name,
         &output.compare_url,
+        pull_request.as_ref().map(|pr| pr.html_url.as_str()),
         &output.changed_files,
         &ForgeVerificationSummary {
             commands: output
@@ -135,8 +157,12 @@ async fn process_approve_job(
         },
     );
     post_comment_if_configured(event, &comment).await?;
-    jobs.update(job_id, |job| job.state = ForgeJobState::BranchPushed)
-        .await?;
+    jobs.update(job_id, |job| {
+        job.state = ForgeJobState::BranchPushed;
+        job.pull_request_url = pull_request.as_ref().map(|pr| pr.html_url.clone());
+        job.pull_request_number = pull_request.as_ref().map(|pr| pr.number);
+    })
+    .await?;
     Ok(())
 }
 
@@ -188,6 +214,7 @@ pub fn build_issue_plan(event: &ForgeGitHubEvent) -> Result<ForgePlan, ForgeErro
         checks: configured_checks(),
         risk: "Medium: Forge will execute only after approval in an E2B sandbox, then report verification output before a PR is opened.".to_string(),
         branch_name: issue_branch_name(*number),
+        codebase_context: None,
     })
 }
 
@@ -350,6 +377,61 @@ async fn fetch_pr_files_if_configured(
         .await
 }
 
+async fn create_pull_request_for_output(
+    event: &ForgeGitHubEvent,
+    output: &E2bRunnerOutput,
+) -> Result<Option<crate::github_app_auth::GitHubPullRequestResponse>, ForgeError> {
+    if output.changed_files.is_empty() {
+        return Ok(None);
+    }
+    let Some(installation_id) = event.installation_id else {
+        return Ok(None);
+    };
+    let GitHubSubject::Issue { number, title, .. } = &event.subject else {
+        return Ok(None);
+    };
+    let Ok(config) = GitHubAppConfig::from_env() else {
+        return Ok(None);
+    };
+    let body = format!(
+        "Forge implemented issue #{number} after maintainer approval.\n\n\
+         ## Verification\n{}\n\n\
+         ## Risks\n{}\n\n\
+         Closes #{number}.",
+        output
+            .checks
+            .iter()
+            .map(|check| {
+                let status = if check.passed { "passed" } else { "failed" };
+                format!("- `{}`: {} (exit {})", check.command, status, check.exit_code)
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+        if output.risks.is_empty() {
+            "- No known remaining risks.".to_string()
+        } else {
+            output
+                .risks
+                .iter()
+                .map(|risk| format!("- {risk}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        }
+    );
+    let pr = GitHubAppClient::new(config)
+        .create_pull_request(
+            installation_id,
+            &event.repository.owner,
+            &event.repository.name,
+            &format!("Forge: {title}"),
+            &output.branch_name,
+            &event.repository.default_branch,
+            &body,
+        )
+        .await?;
+    Ok(Some(pr))
+}
+
 fn configured_checks() -> Vec<String> {
     std::env::var("FORGE_PUBLIC_CHECKS")
         .ok()
@@ -396,6 +478,7 @@ async fn post_comment_if_configured(
 
 #[derive(Debug, serde::Serialize)]
 struct E2bRunnerInput {
+    mode: String,
     repository: E2bRepositoryInput,
     issue: E2bIssueInput,
     branch_name: String,
@@ -438,10 +521,118 @@ pub struct E2bRunnerOutput {
 }
 
 #[derive(Debug, serde::Deserialize)]
+pub struct E2bPlanRunnerOutput {
+    pub mode: String,
+    pub repository: String,
+    pub branch: String,
+    pub exploration: serde_json::Value,
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub struct E2bCheckOutput {
     pub command: String,
     pub exit_code: i32,
     pub passed: bool,
+}
+
+async fn run_e2b_plan_job(event: &ForgeGitHubEvent) -> Result<ForgePlan, ForgeError> {
+    let Some(installation_id) = event.installation_id else {
+        return Err(ForgeError::Config(
+            "GitHub installation id is required for codebase inspection".to_string(),
+        ));
+    };
+    let GitHubSubject::Issue {
+        number,
+        title,
+        body,
+        ..
+    } = &event.subject
+    else {
+        return Err(ForgeError::Config(
+            "E2B planning requires an issue event".to_string(),
+        ));
+    };
+    let branch_name = issue_branch_name(*number);
+    let token = GitHubAppClient::new(GitHubAppConfig::from_env()?)
+        .installation_token(installation_id)
+        .await?;
+    let input = E2bRunnerInput {
+        mode: "explore".to_string(),
+        repository: E2bRepositoryInput {
+            owner: event.repository.owner.clone(),
+            name: event.repository.name.clone(),
+            clone_url: event.repository.clone_url.clone(),
+            default_branch: event.repository.default_branch.clone(),
+        },
+        issue: E2bIssueInput {
+            number: *number,
+            title: title.clone(),
+            body: body.clone(),
+        },
+        branch_name: branch_name.clone(),
+        installation_token: token,
+        work_command: None,
+        model: e2b_model_from_env(),
+        max_steps: std::env::var("FORGE_E2B_MAX_STEPS")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(6),
+        checks: configured_checks(),
+    };
+    let stdout =
+        run_e2b_runner_with_json(&serde_json::to_vec(&input).map_err(ForgeError::Json)?).await?;
+    let inspection = parse_e2b_plan_runner_output(&stdout)?;
+    build_issue_plan_from_inspection(event, &inspection)
+}
+
+fn build_issue_plan_from_inspection(
+    event: &ForgeGitHubEvent,
+    inspection: &E2bPlanRunnerOutput,
+) -> Result<ForgePlan, ForgeError> {
+    if inspection.mode != "exploration" {
+        return Err(ForgeError::Environment(format!(
+            "E2B planning returned unexpected mode `{}`",
+            inspection.mode
+        )));
+    }
+    let GitHubSubject::Issue {
+        number,
+        title,
+        body,
+        ..
+    } = &event.subject
+    else {
+        return Err(ForgeError::Config(
+            "cannot build an issue plan from a pull request event".to_string(),
+        ));
+    };
+    let summary = inspection
+        .exploration
+        .get("synthesized_summary")
+        .and_then(|summary| serde_json::to_string_pretty(summary).ok())
+        .unwrap_or_else(|| {
+            serde_json::to_string_pretty(&inspection.exploration)
+                .unwrap_or_else(|_| "Codebase inspection completed, but the summary could not be rendered.".to_string())
+        });
+    let issue_body = body
+        .as_deref()
+        .filter(|text| !text.trim().is_empty())
+        .unwrap_or("No issue body was provided.");
+
+    Ok(ForgePlan {
+        summary: format!("Issue #{number}: {title}\n\n{issue_body}"),
+        proposed_change: format!(
+            "Use the inspected `{}` repository context to make the smallest code change that satisfies this issue, then run the checks listed below.",
+            inspection.repository
+        ),
+        checks: configured_checks(),
+        risk: format!(
+            "Medium: Forge inspected `{}` at `{}` in E2B. Implementation still waits for maintainer approval and will run in a fresh E2B sandbox.",
+            inspection.repository, inspection.branch
+        ),
+        branch_name: issue_branch_name(*number),
+        codebase_context: Some(summary),
+    })
 }
 
 async fn run_e2b_job(
@@ -471,6 +662,7 @@ async fn run_e2b_job(
     };
 
     let input = E2bRunnerInput {
+        mode: "implement".to_string(),
         repository: E2bRepositoryInput {
             owner: event.repository.owner.clone(),
             name: event.repository.name.clone(),
@@ -551,6 +743,15 @@ pub fn parse_e2b_runner_output(stdout: &str) -> Result<E2bRunnerOutput, ForgeErr
     serde_json::from_str(json_line).map_err(ForgeError::Json)
 }
 
+pub fn parse_e2b_plan_runner_output(stdout: &str) -> Result<E2bPlanRunnerOutput, ForgeError> {
+    let json_line = stdout
+        .lines()
+        .rev()
+        .find(|line| !line.trim().is_empty())
+        .ok_or_else(|| ForgeError::Environment("E2B runner emitted no output".to_string()))?;
+    serde_json::from_str(json_line).map_err(ForgeError::Json)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -599,6 +800,46 @@ mod tests {
         assert!(plan.summary.contains("Users land on / after OAuth."));
         assert!(plan.proposed_change.contains("main"));
         assert_eq!(plan.branch_name, "forge/issue-9");
+    }
+
+    #[test]
+    fn codebase_inspection_builds_approval_plan() {
+        let inspection = E2bPlanRunnerOutput {
+            mode: "exploration".to_string(),
+            repository: "acme/app".to_string(),
+            branch: "main".to_string(),
+            exploration: serde_json::json!({
+                "synthesized_summary": {
+                    "language": "Rust",
+                    "framework": "Axum",
+                    "test_setup": "cargo test --workspace"
+                }
+            }),
+        };
+
+        let plan = build_issue_plan_from_inspection(&issue_event(ForgeCommand::Plan), &inspection)
+            .unwrap();
+
+        assert!(plan.codebase_context.unwrap().contains("Axum"));
+        assert!(plan.proposed_change.contains("acme/app"));
+        assert!(plan.risk.contains("main"));
+        assert_eq!(plan.branch_name, "forge/issue-9");
+    }
+
+    #[test]
+    fn parse_e2b_plan_output_uses_last_json_line() {
+        let output = parse_e2b_plan_runner_output(
+            "creating sandbox\n{\"mode\":\"exploration\",\"repository\":\"acme/app\",\"branch\":\"main\",\"exploration\":{\"synthesized_summary\":{\"language\":\"Rust\"}}}\n",
+        )
+        .unwrap();
+
+        assert_eq!(output.mode, "exploration");
+        assert_eq!(output.repository, "acme/app");
+        assert_eq!(output.branch, "main");
+        assert_eq!(
+            output.exploration["synthesized_summary"]["language"],
+            "Rust"
+        );
     }
 
     #[test]

@@ -88,6 +88,70 @@ const parseModelAction = (content) => {
   }
 }
 
+const runCodebaseExploration = async (sandbox, repoDir, input) => {
+  // Exploration commands that run inside the sandbox to understand the codebase
+  const explorationCommands = [
+    { name: 'file_tree', cmd: 'find . -maxdepth 3 -type f | grep -v node_modules | grep -v \\.git | grep -v __pycache__ | grep -v target/ | head -150' },
+    { name: 'package_json', cmd: 'cat package.json 2>/dev/null || echo "NO_PACKAGE_JSON"' },
+    { name: 'cargo_toml', cmd: 'cat Cargo.toml 2>/dev/null || echo "NO_CARGO_TOML"' },
+    { name: 'requirements', cmd: 'cat requirements.txt 2>/dev/null; cat pyproject.toml 2>/dev/null; echo "---"; cat setup.py 2>/dev/null || echo "NO_PYTHON_DEPS"' },
+    { name: 'docker_config', cmd: 'cat Dockerfile 2>/dev/null; echo "---"; cat docker-compose.yml 2>/dev/null || echo "NO_DOCKER"' },
+    { name: 'test_files', cmd: 'find . -type f \\( -name "*.test.*" -o -name "*.spec.*" -o -name "*_test.*" -o -name "test_*" \\) | grep -v node_modules | grep -v \\.git | head -30' },
+    { name: 'readme', cmd: 'head -80 README.md 2>/dev/null || echo "NO_README"' },
+    { name: 'src_structure', cmd: 'ls -la src/ 2>/dev/null; echo "---"; ls -la lib/ 2>/dev/null; echo "---"; ls -la crates/ 2>/dev/null || echo "NO_SRC_LIB_CRATES"' },
+    { name: 'config_files', cmd: 'find . -maxdepth 2 -type f \\( -name "*.json" -o -name "*.yaml" -o -name "*.yml" -o -name "*.toml" -o -name "*.env*" -o -name ".eslintrc*" -o -name ".prettierrc*" -o -name "tsconfig*" \\) | grep -v node_modules | grep -v \\.git | head -20' },
+    { name: 'entry_points', cmd: 'cat package.json 2>/dev/null | grep -A5 "\"scripts\"" || echo "NO_NPM_SCRIPTS"; echo "---"; cat Cargo.toml 2>/dev/null | grep -A2 "\\[\\[bin\\]\\]" || echo "NO_RUST_BINS"' },
+  ]
+
+  const results = {}
+  for (const { name, cmd } of explorationCommands) {
+    try {
+      const result = await sandbox.commands.run(cmd, { cwd: repoDir, timeoutMs: 15000, requestTimeoutMs: 10000 })
+      results[name] = String(result.stdout || '').trim().slice(0, 4000)
+    } catch (err) {
+      results[name] = `[error: ${err?.message || String(err)}]`
+    }
+  }
+
+  // Use model to synthesize exploration into a structured summary
+  if (input.model) {
+    const summaryPrompt = [
+      'You are analyzing a codebase structure. Based on these exploration results, produce a concise summary.',
+      '',
+      `Repository: ${input.repository.owner}/${input.repository.name}`,
+      `Default branch: ${input.repository.default_branch}`,
+      '',
+      '## Exploration Data',
+      ...Object.entries(results).map(([name, data]) => `### ${name}\n${data}`),
+      '',
+      'Return strict JSON only:',
+      '{',
+      '  "language": "primary language detected",',
+      '  "framework": "framework/library if detected, else null",',
+      '  "structure_summary": "2-3 sentence summary of the codebase architecture",',
+      '  "key_directories": ["list of important directories and their purpose"],',
+      '  "test_setup": "how tests are run, or null if no tests found",',
+      '  "build_system": "how the project builds",',
+      '  "entry_points": ["main entry points of the application"],',
+      '  "notable_patterns": ["notable patterns or conventions observed"]',
+      '}',
+    ].join('\n')
+
+    try {
+      const summaryContent = await callModel(input.model, [
+        { role: 'system', content: 'You are a codebase analysis tool. Return ONLY valid JSON. No markdown, no explanation.' },
+        { role: 'user', content: summaryPrompt },
+      ])
+      const parsed = JSON.parse(summaryContent)
+      results.synthesized_summary = parsed
+    } catch (err) {
+      results.synthesized_summary = { error: `Model synthesis failed: ${err?.message || String(err)}`, raw_results: results }
+    }
+  }
+
+  return results
+}
+
 const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
   if (!input.model) {
     throw new Error('FORGE_E2B_WORK_COMMAND or FORGE_MODEL/FORGE_BASE_URL/FORGE_API_KEY is required for E2B execution')
@@ -187,7 +251,18 @@ try {
   const issueBase64 = Buffer.from(issueMarkdown, 'utf8').toString('base64')
   await run(sandbox, `printf %s ${shellQuote(issueBase64)} | base64 -d > ${shellQuote(issuePath)}`)
 
-  const checks = []
+  // Exploration mode: analyze codebase and return findings without making changes
+  if (input.mode === 'explore') {
+    const exploration = await runCodebaseExploration(sandbox, repoDir, input)
+    const output = {
+      mode: 'exploration',
+      repository: `${repo.owner}/${repo.name}`,
+      branch: repo.default_branch,
+      exploration,
+    }
+    console.log(JSON.stringify(output))
+    process.exitCode = 0
+  } else {
   if (input.work_command) {
     const command = [
       `FORGE_ISSUE_FILE=${shellQuote(issuePath)}`,
@@ -233,6 +308,7 @@ try {
     risks,
   }
   console.log(JSON.stringify(output))
+  }
 } catch (error) {
   console.error(error?.stack || String(error))
   process.exitCode = 1

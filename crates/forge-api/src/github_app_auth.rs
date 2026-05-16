@@ -160,6 +160,53 @@ impl GitHubAppClient {
             .map_err(|e| ForgeError::Http(e.to_string()))
     }
 
+    pub async fn create_pull_request(
+        &self,
+        installation_id: u64,
+        owner: &str,
+        repo: &str,
+        title: &str,
+        head: &str,
+        base: &str,
+        body: &str,
+    ) -> Result<GitHubPullRequestResponse, ForgeError> {
+        let token = self.installation_token(installation_id).await?;
+        let url = format!(
+            "{}/repos/{owner}/{repo}/pulls",
+            self.config.api_base_url.trim_end_matches('/')
+        );
+        let response = self
+            .client
+            .post(url)
+            .header(USER_AGENT, "Forge")
+            .header(ACCEPT, "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .bearer_auth(token)
+            .json(&serde_json::json!({
+                "title": title,
+                "head": head,
+                "base": base,
+                "body": body,
+                "maintainer_can_modify": true,
+            }))
+            .send()
+            .await
+            .map_err(|e| ForgeError::Http(e.to_string()))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(ForgeError::Http(format!(
+                "GitHub pull request create request failed {status}: {body}"
+            )));
+        }
+
+        response
+            .json::<GitHubPullRequestResponse>()
+            .await
+            .map_err(|e| ForgeError::Http(e.to_string()))
+    }
+
     fn app_jwt(&self) -> Result<String, ForgeError> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -201,4 +248,10 @@ pub struct GitHubPullRequestFile {
     pub additions: u64,
     pub deletions: u64,
     pub patch: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GitHubPullRequestResponse {
+    pub number: u64,
+    pub html_url: String,
 }
