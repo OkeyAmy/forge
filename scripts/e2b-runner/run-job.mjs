@@ -145,7 +145,7 @@ const runCodebaseExploration = async (sandbox, repoDir, input) => {
       const parsed = JSON.parse(summaryContent)
       results.synthesized_summary = parsed
     } catch (err) {
-      results.synthesized_summary = { error: `Model synthesis failed: ${err?.message || String(err)}`, raw_results: results }
+      results.synthesized_summary = { error: `Model synthesis failed: ${err?.message || String(err)}` }
     }
   }
 
