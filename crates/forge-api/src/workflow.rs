@@ -196,6 +196,7 @@ async fn process_review_job(
     Ok(())
 }
 
+#[cfg(test)]
 pub fn build_issue_plan(event: &ForgeGitHubEvent) -> Result<ForgePlan, ForgeError> {
     let GitHubSubject::Issue {
         number,
@@ -585,7 +586,12 @@ async fn run_e2b_plan_job(event: &ForgeGitHubEvent) -> Result<ForgePlan, ForgeEr
         branch_name: branch_name.clone(),
         installation_token: token,
         work_command: None,
-        model: e2b_model_from_env(),
+        model: Some(e2b_model_from_env().ok_or_else(|| {
+            ForgeError::Config(
+                "FORGE_MODEL, FORGE_BASE_URL, and FORGE_API_KEY are required for E2B planning"
+                    .to_string(),
+            )
+        })?),
         max_steps: std::env::var("FORGE_E2B_MAX_STEPS")
             .ok()
             .and_then(|value| value.parse().ok())
@@ -622,11 +628,20 @@ fn build_issue_plan_from_inspection(
     let summary = inspection
         .exploration
         .get("synthesized_summary")
-        .and_then(|summary| serde_json::to_string_pretty(summary).ok())
-        .unwrap_or_else(|| {
-            serde_json::to_string_pretty(&inspection.exploration)
-                .unwrap_or_else(|_| "Codebase inspection completed, but the summary could not be rendered.".to_string())
-        });
+        .map(|summary| {
+            if let Some(error) = summary.get("error").and_then(|value| value.as_str()) {
+                return Err(ForgeError::Environment(format!(
+                    "E2B model synthesis failed: {error}"
+                )));
+            }
+            serde_json::to_string_pretty(summary).map_err(ForgeError::Json)
+        })
+        .transpose()?
+        .ok_or_else(|| {
+            ForgeError::Environment(
+                "E2B inspection did not return a model-synthesized codebase summary".to_string(),
+            )
+        })?;
     let issue_body = body
         .as_deref()
         .filter(|text| !text.trim().is_empty())
@@ -837,6 +852,27 @@ mod tests {
         assert!(plan.proposed_change.contains("acme/app"));
         assert!(plan.risk.contains("main"));
         assert_eq!(plan.branch_name, "forge/issue-9");
+    }
+
+    #[test]
+    fn codebase_inspection_rejects_model_synthesis_errors() {
+        let inspection = E2bPlanRunnerOutput {
+            mode: "exploration".to_string(),
+            repository: "acme/app".to_string(),
+            branch: "main".to_string(),
+            exploration: serde_json::json!({
+                "synthesized_summary": {
+                    "error": "model request failed 400: API key expired"
+                }
+            }),
+        };
+
+        let error =
+            build_issue_plan_from_inspection(&issue_event(ForgeCommand::Plan), &inspection)
+                .unwrap_err()
+                .to_string();
+
+        assert!(error.contains("API key expired"));
     }
 
     #[test]
