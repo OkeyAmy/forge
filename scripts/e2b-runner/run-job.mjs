@@ -81,6 +81,7 @@ const callModel = async (modelConfig, messages) => {
       model: modelConfig.model,
       messages,
       temperature: 0.1,
+      max_tokens: 4096,
     }),
   })
   if (!response.ok) {
@@ -94,12 +95,34 @@ const callModel = async (modelConfig, messages) => {
   return content
 }
 
+const extractOutermostJson = (text) => {
+  const start = text.indexOf('{')
+  if (start === -1) return ''
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+    if (escaped) { escaped = false; continue }
+    if (ch === '\\' && inString) { escaped = true; continue }
+    if (ch === '"') { inString = !inString; continue }
+    if (inString) continue
+    if (ch === '{') depth++
+    else if (ch === '}') {
+      depth--
+      if (depth === 0) return text.slice(start, i + 1)
+    }
+  }
+  return ''
+}
+
 const parseModelJson = (content) => {
   const text = String(content || '').trim()
+  // Prefer fenced code blocks (```json ... ``` or ``` ... ```)
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
   const candidate = fenced
     ? fenced[1].trim()
-    : text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1).trim()
+    : extractOutermostJson(text)
   if (!candidate) {
     throw new Error('model response did not include a JSON object')
   }
