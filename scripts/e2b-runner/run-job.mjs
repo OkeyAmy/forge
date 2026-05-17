@@ -89,8 +89,34 @@ const parseModelJson = (content) => {
   return JSON.parse(candidate)
 }
 
-const parseModelAction = (content) => {
-  const parsed = parseModelJson(content)
+const callModelJson = async (modelConfig, messages, schemaDescription) => {
+  const content = await callModel(modelConfig, messages)
+  try {
+    return { parsed: parseModelJson(content), content }
+  } catch (error) {
+    const repaired = await callModel(modelConfig, [
+      {
+        role: 'system',
+        content: 'You repair malformed model output into valid JSON. Return ONLY valid JSON. No markdown, no explanation.',
+      },
+      {
+        role: 'user',
+        content: [
+          `The previous response was not valid JSON: ${error?.message || String(error)}`,
+          '',
+          'Expected JSON shape:',
+          schemaDescription,
+          '',
+          'Malformed response:',
+          truncate(content, 12000),
+        ].join('\n'),
+      },
+    ])
+    return { parsed: parseModelJson(repaired), content: repaired }
+  }
+}
+
+const modelActionFromJson = (parsed) => {
   return {
     done: Boolean(parsed.done),
     commands: Array.isArray(parsed.commands) ? parsed.commands.map(String).filter(Boolean).slice(0, 5) : [],
@@ -148,11 +174,14 @@ const runCodebaseExploration = async (sandbox, repoDir, input) => {
     ].join('\n')
 
     try {
-      const summaryContent = await callModel(input.model, [
-        { role: 'system', content: 'You are a codebase analysis tool. Return ONLY valid JSON. No markdown, no explanation.' },
-        { role: 'user', content: summaryPrompt },
-      ])
-      const parsed = parseModelJson(summaryContent)
+      const { parsed } = await callModelJson(
+        input.model,
+        [
+          { role: 'system', content: 'You are a codebase analysis tool. Return ONLY valid JSON. No markdown, no explanation.' },
+          { role: 'user', content: summaryPrompt },
+        ],
+        '{"language": string, "framework": string|null, "structure_summary": string, "key_directories": string[], "test_setup": string|null, "build_system": string, "entry_points": string[], "notable_patterns": string[]}',
+      )
       results.synthesized_summary = parsed
     } catch (err) {
       results.synthesized_summary = { error: `Model synthesis failed: ${err?.message || String(err)}` }
@@ -197,8 +226,12 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
 
   const checks = []
   for (let step = 1; step <= maxSteps; step += 1) {
-    const content = await callModel(input.model, messages)
-    const action = parseModelAction(content)
+    const { parsed, content } = await callModelJson(
+      input.model,
+      messages,
+      '{"done": boolean, "commands": string[], "notes": string}',
+    )
+    const action = modelActionFromJson(parsed)
     if (action.done) {
       checks.push({ command: `forge-model-step-${step}`, exit_code: 0, passed: true, stdout: action.notes, stderr: '' })
       return checks
