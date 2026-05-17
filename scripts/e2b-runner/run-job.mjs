@@ -77,10 +77,20 @@ const callModel = async (modelConfig, messages) => {
   return content
 }
 
+const parseModelJson = (content) => {
+  const text = String(content || '').trim()
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  const candidate = fenced
+    ? fenced[1].trim()
+    : text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1).trim()
+  if (!candidate) {
+    throw new Error('model response did not include a JSON object')
+  }
+  return JSON.parse(candidate)
+}
+
 const parseModelAction = (content) => {
-  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  const candidate = fenced ? fenced[1] : content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1)
-  const parsed = JSON.parse(candidate)
+  const parsed = parseModelJson(content)
   return {
     done: Boolean(parsed.done),
     commands: Array.isArray(parsed.commands) ? parsed.commands.map(String).filter(Boolean).slice(0, 5) : [],
@@ -142,7 +152,7 @@ const runCodebaseExploration = async (sandbox, repoDir, input) => {
         { role: 'system', content: 'You are a codebase analysis tool. Return ONLY valid JSON. No markdown, no explanation.' },
         { role: 'user', content: summaryPrompt },
       ])
-      const parsed = JSON.parse(summaryContent)
+      const parsed = parseModelJson(summaryContent)
       results.synthesized_summary = parsed
     } catch (err) {
       results.synthesized_summary = { error: `Model synthesis failed: ${err?.message || String(err)}` }
