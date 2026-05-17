@@ -1,7 +1,11 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Sandbox } from 'e2b'
 
 const input = JSON.parse(readFileSync(0, 'utf8'))
+const scriptDir = dirname(fileURLToPath(import.meta.url))
+const skillsDir = join(scriptDir, 'skills')
 const timeoutMs = Number(process.env.E2B_TIMEOUT_MS || '900000')
 const requestTimeoutMs = Number(process.env.E2B_REQUEST_TIMEOUT_MS || '60000')
 const template = process.env.E2B_TEMPLATE || undefined
@@ -37,6 +41,19 @@ const truncate = (value, max = 6000) => {
   const text = String(value || '')
   return text.length > max ? `${text.slice(0, max)}\n[truncated]` : text
 }
+
+const readWorkflowSkill = (name) => {
+  const path = join(skillsDir, name, 'SKILL.md')
+  return existsSync(path) ? readFileSync(path, 'utf8').trim() : ''
+}
+
+const workflowSkillPack = (names) => names
+  .map((name) => {
+    const skill = readWorkflowSkill(name)
+    return skill ? `## ${name}/SKILL.md\n${skill}` : ''
+  })
+  .filter(Boolean)
+  .join('\n\n---\n\n')
 
 const run = async (sandbox, command, cwd = undefined) => {
   const result = await retry(`command ${command}`, () =>
@@ -152,11 +169,17 @@ const runCodebaseExploration = async (sandbox, repoDir, input) => {
 
   // Use model to synthesize exploration into a structured summary
   if (input.model) {
+    const planningSkills = workflowSkillPack(['issue-intake', 'repository-inspection', 'planning', 'validation', 'github-communication'])
     const summaryPrompt = [
-      'You are analyzing a codebase structure. Based on these exploration results, produce a concise summary.',
+      'You are Forge planning a real GitHub issue workflow. Use the workflow skills and repository exploration to produce a maintainer-readable engineering plan.',
       '',
       `Repository: ${input.repository.owner}/${input.repository.name}`,
       `Default branch: ${input.repository.default_branch}`,
+      `Issue #${input.issue.number}: ${input.issue.title}`,
+      input.issue.body || 'No issue body was provided.',
+      '',
+      '## Forge Workflow Skills',
+      planningSkills,
       '',
       '## Exploration Data',
       ...Object.entries(results).map(([name, data]) => `### ${name}\n${data}`),
@@ -203,11 +226,17 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
   }
 
   const maxSteps = Number(input.max_steps || 6)
+  const implementationSkills = workflowSkillPack(['approval', 'implementation', 'validation', 'review', 'pull-request', 'github-communication'])
   const messages = [
     {
       role: 'system',
       content: [
         'You are Forge running inside an E2B sandbox.',
+        'You are not a generic coding chatbot. You are executing a professional software engineering pipeline.',
+        'Follow the Forge workflow skills below for how to inspect, implement, validate, review, and prepare a PR.',
+        '',
+        implementationSkills,
+        '',
         'You may inspect and edit the cloned repository only through shell commands.',
         'Return strict JSON only: {"done": boolean, "commands": ["shell command"], "notes": "short reason"}.',
         'Use commands to inspect files, edit code, and run focused tests.',
