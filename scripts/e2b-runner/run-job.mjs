@@ -134,6 +134,7 @@ const runCodebaseExploration = async (sandbox, repoDir, input) => {
     { name: 'docker_config', cmd: 'cat Dockerfile 2>/dev/null; echo "---"; cat docker-compose.yml 2>/dev/null || echo "NO_DOCKER"' },
     { name: 'test_files', cmd: 'find . -type f \\( -name "*.test.*" -o -name "*.spec.*" -o -name "*_test.*" -o -name "test_*" \\) | grep -v node_modules | grep -v \\.git | head -30' },
     { name: 'readme', cmd: 'head -80 README.md 2>/dev/null || echo "NO_README"' },
+    { name: 'skill_md', cmd: 'cat SKILL.md 2>/dev/null || cat .forge/SKILL.md 2>/dev/null || cat .github/forge/SKILL.md 2>/dev/null || echo "NO_SKILL_MD"' },
     { name: 'src_structure', cmd: 'ls -la src/ 2>/dev/null; echo "---"; ls -la lib/ 2>/dev/null; echo "---"; ls -la crates/ 2>/dev/null || echo "NO_SRC_LIB_CRATES"' },
     { name: 'config_files', cmd: 'find . -maxdepth 2 -type f \\( -name "*.json" -o -name "*.yaml" -o -name "*.yml" -o -name "*.toml" -o -name "*.env*" -o -name ".eslintrc*" -o -name ".prettierrc*" -o -name "tsconfig*" \\) | grep -v node_modules | grep -v \\.git | head -20' },
     { name: 'entry_points', cmd: 'cat package.json 2>/dev/null | grep -A5 "\"scripts\"" || echo "NO_NPM_SCRIPTS"; echo "---"; cat Cargo.toml 2>/dev/null | grep -A2 "\\[\\[bin\\]\\]" || echo "NO_RUST_BINS"' },
@@ -168,8 +169,13 @@ const runCodebaseExploration = async (sandbox, repoDir, input) => {
       '  "key_directories": ["list of important directories and their purpose"],',
       '  "test_setup": "how tests are run, or null if no tests found",',
       '  "build_system": "how the project builds",',
+      '  "recommended_checks": ["commands Forge should run for this issue, using scripts/config actually present in the repo"],',
       '  "entry_points": ["main entry points of the application"],',
-      '  "notable_patterns": ["notable patterns or conventions observed"]',
+      '  "notable_patterns": ["notable patterns or conventions observed"],',
+      '  "implementation_plan": ["short ordered engineering steps for this issue"],',
+      '  "risk_level": "low|medium|high",',
+      '  "risk_notes": "specific risk note for this issue",',
+      '  "skill_instructions": "summary of SKILL.md guidance if present, else null"',
       '}',
     ].join('\n')
 
@@ -180,7 +186,7 @@ const runCodebaseExploration = async (sandbox, repoDir, input) => {
           { role: 'system', content: 'You are a codebase analysis tool. Return ONLY valid JSON. No markdown, no explanation.' },
           { role: 'user', content: summaryPrompt },
         ],
-        '{"language": string, "framework": string|null, "structure_summary": string, "key_directories": string[], "test_setup": string|null, "build_system": string, "entry_points": string[], "notable_patterns": string[]}',
+        '{"language": string, "framework": string|null, "structure_summary": string, "key_directories": string[], "test_setup": string|null, "build_system": string, "recommended_checks": string[], "entry_points": string[], "notable_patterns": string[], "implementation_plan": string[], "risk_level": "low|medium|high", "risk_notes": string, "skill_instructions": string|null}',
       )
       results.synthesized_summary = parsed
     } catch (err) {
@@ -205,6 +211,7 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
         'You may inspect and edit the cloned repository only through shell commands.',
         'Return strict JSON only: {"done": boolean, "commands": ["shell command"], "notes": "short reason"}.',
         'Use commands to inspect files, edit code, and run focused tests.',
+        'If the repository contains SKILL.md, .forge/SKILL.md, or .github/forge/SKILL.md, read it first and follow its repo-specific instructions.',
         'Do not print secrets or environment variables.',
         'Set done=true only after the repository has the intended code changes.',
       ].join('\n'),
@@ -219,7 +226,7 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
         '',
         input.issue.body || 'No issue body was provided.',
         '',
-        'Start by inspecting the repository, then make the smallest useful change.',
+        'Start by inspecting the repository and any Forge SKILL.md file, then make the smallest useful change.',
       ].join('\n'),
     },
   ]

@@ -453,7 +453,7 @@ fn configured_checks() -> Vec<String> {
                 .map(ToOwned::to_owned)
                 .collect()
         })
-        .unwrap_or_else(|| vec!["cargo test --workspace".to_string()])
+        .unwrap_or_default()
 }
 
 fn issue_branch_name(issue_number: u64) -> String {
@@ -634,7 +634,7 @@ fn build_issue_plan_from_inspection(
                     "E2B model synthesis failed: {error}"
                 )));
             }
-            serde_json::to_string_pretty(summary).map_err(ForgeError::Json)
+            Ok(summary.clone())
         })
         .transpose()?
         .ok_or_else(|| {
@@ -649,18 +649,135 @@ fn build_issue_plan_from_inspection(
 
     Ok(ForgePlan {
         summary: format!("Issue #{number}: {title}\n\n{issue_body}"),
-        proposed_change: format!(
-            "Use the inspected `{}` repository context to make the smallest code change that satisfies this issue, then run the checks listed below.",
-            inspection.repository
-        ),
-        checks: configured_checks(),
-        risk: format!(
-            "Medium: Forge inspected `{}` at `{}` in E2B. Implementation still waits for maintainer approval and will run in a fresh E2B sandbox.",
-            inspection.repository, inspection.branch
-        ),
+        proposed_change: render_proposed_change(&summary, &inspection.repository),
+        checks: recommended_checks(&summary),
+        risk: render_plan_risk(&summary, &inspection.repository, &inspection.branch),
         branch_name: issue_branch_name(*number),
-        codebase_context: Some(summary),
+        codebase_context: Some(render_codebase_context(&summary)),
     })
+}
+
+fn render_codebase_context(summary: &serde_json::Value) -> String {
+    let mut sections = Vec::new();
+    let mut stack = Vec::new();
+    if let Some(language) = json_string(summary, "language") {
+        stack.push(format!("Language: {language}"));
+    }
+    if let Some(framework) = json_string(summary, "framework") {
+        stack.push(format!("Framework: {framework}"));
+    }
+    if let Some(build_system) = json_string(summary, "build_system") {
+        stack.push(format!("Build: {build_system}"));
+    }
+    if let Some(test_setup) = json_string(summary, "test_setup") {
+        stack.push(format!("Tests: {test_setup}"));
+    }
+    if !stack.is_empty() {
+        sections.push(format!("**Stack**\n{}", markdown_list(&stack)));
+    }
+    if let Some(structure) = json_string(summary, "structure_summary") {
+        sections.push(format!("**Repository Shape**\n{structure}"));
+    }
+    if let Some(directories) = json_string_array(summary, "key_directories") {
+        sections.push(format!("**Important Areas**\n{}", markdown_list(&directories)));
+    }
+    if let Some(patterns) = json_string_array(summary, "notable_patterns") {
+        sections.push(format!("**Conventions I Noticed**\n{}", markdown_list(&patterns)));
+    }
+    if let Some(skill) = json_string(summary, "skill_instructions") {
+        sections.push(format!("**Repo Skill Guidance**\n{skill}"));
+    }
+    if sections.is_empty() {
+        "Forge inspected the repository in E2B, but the model did not return descriptive context."
+            .to_string()
+    } else {
+        sections.join("\n\n")
+    }
+}
+
+fn render_proposed_change(summary: &serde_json::Value, repository: &str) -> String {
+    let Some(steps) = json_string_array(summary, "implementation_plan") else {
+        return format!(
+            "Use the inspected `{repository}` repository context to make the smallest safe change that satisfies the issue."
+        );
+    };
+    if steps.is_empty() {
+        return format!(
+            "Use the inspected `{repository}` repository context to make the smallest safe change that satisfies the issue."
+        );
+    }
+    format!(
+        "I will follow this implementation path:\n{}",
+        markdown_numbered_list(&steps)
+    )
+}
+
+fn recommended_checks(summary: &serde_json::Value) -> Vec<String> {
+    let model_checks = json_string_array(summary, "recommended_checks").unwrap_or_default();
+    if model_checks.is_empty() {
+        configured_checks()
+    } else {
+        model_checks
+    }
+}
+
+fn render_plan_risk(summary: &serde_json::Value, repository: &str, branch: &str) -> String {
+    let level = json_string(summary, "risk_level").unwrap_or_else(|| "medium".to_string());
+    let notes = json_string(summary, "risk_notes").unwrap_or_else(|| {
+        "Implementation waits for maintainer approval and runs in a fresh E2B sandbox.".to_string()
+    });
+    format!(
+        "{}: Forge inspected `{repository}` at `{branch}` in E2B. {notes}",
+        capitalize_first(&level)
+    )
+}
+
+fn json_string(value: &serde_json::Value, key: &str) -> Option<String> {
+    value
+        .get(key)
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && !value.eq_ignore_ascii_case("null"))
+        .map(ToOwned::to_owned)
+}
+
+fn json_string_array(value: &serde_json::Value, key: &str) -> Option<Vec<String>> {
+    Some(
+        value
+            .get(key)?
+            .as_array()?
+            .iter()
+            .filter_map(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+            .collect(),
+    )
+}
+
+fn markdown_list(items: &[String]) -> String {
+    items
+        .iter()
+        .map(|item| format!("- {item}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn markdown_numbered_list(items: &[String]) -> String {
+    items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| format!("{}. {item}", index + 1))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn capitalize_first(value: &str) -> String {
+    let mut chars = value.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => value.to_string(),
+    }
 }
 
 async fn run_e2b_job(
@@ -840,7 +957,13 @@ mod tests {
                 "synthesized_summary": {
                     "language": "Rust",
                     "framework": "Axum",
-                    "test_setup": "cargo test --workspace"
+                    "structure_summary": "Axum API with handlers under src/.",
+                    "key_directories": ["src: application code"],
+                    "test_setup": "cargo test --workspace",
+                    "recommended_checks": ["cargo test --workspace"],
+                    "implementation_plan": ["Read the affected handler.", "Patch the redirect logic."],
+                    "risk_level": "low",
+                    "risk_notes": "Small isolated backend change."
                 }
             }),
         };
@@ -848,8 +971,12 @@ mod tests {
         let plan = build_issue_plan_from_inspection(&issue_event(ForgeCommand::Plan), &inspection)
             .unwrap();
 
-        assert!(plan.codebase_context.unwrap().contains("Axum"));
-        assert!(plan.proposed_change.contains("acme/app"));
+        let context = plan.codebase_context.unwrap();
+        assert!(context.contains("Framework: Axum"));
+        assert!(context.contains("**Important Areas**"));
+        assert!(!context.contains("\"framework\""));
+        assert!(plan.proposed_change.contains("1. Read the affected handler."));
+        assert_eq!(plan.checks, vec!["cargo test --workspace"]);
         assert!(plan.risk.contains("main"));
         assert_eq!(plan.branch_name, "forge/issue-9");
     }
