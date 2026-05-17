@@ -150,6 +150,7 @@ fn command_slug(command: &ForgeCommand) -> &'static str {
         ForgeCommand::Cancel => "cancel",
         ForgeCommand::Review => "review",
         ForgeCommand::Improve => "improve",
+        ForgeCommand::Feedback { .. } => "feedback",
         ForgeCommand::Ask { .. } => "ask",
         ForgeCommand::Fix => "fix",
     }

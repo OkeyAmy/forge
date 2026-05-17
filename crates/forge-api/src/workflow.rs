@@ -2,8 +2,11 @@ use std::process::Stdio;
 
 use forge_run::run_single::build_model;
 use forge_types::public_workflow::{
-    render_branch_ready_comment, render_plan_comment, ForgeCheckResult, ForgeCommand,
-    ForgeGitHubEvent, ForgeJobState, ForgePlan, ForgeVerificationSummary, GitHubSubject,
+    render_approval_failed_comment, render_approval_started_comment, render_branch_ready_comment,
+    render_feedback_failed_comment, render_feedback_missing_plan_comment,
+    render_feedback_started_comment, render_plan_comment_with_feedback, ForgeCheckResult,
+    ForgeCommand, ForgeGitHubEvent, ForgeJobState, ForgePlan, ForgeVerificationSummary,
+    GitHubSubject,
 };
 use forge_types::{ForgeError, HistoryItem, MessageContent, Role};
 use tokio::sync::mpsc;
@@ -44,16 +47,25 @@ pub async fn process_job(jobs: &FileJobStore, job_id: &str) -> Result<(), ForgeE
     match job.event.command {
         ForgeCommand::Plan => process_plan_job(jobs, job_id, &job.event).await,
         ForgeCommand::Approve => process_approve_job(jobs, job_id, &job.event).await,
+        ForgeCommand::Feedback { ref message } => {
+            process_feedback_job(jobs, job_id, &job.event, &message).await
+        }
         ForgeCommand::Review => process_review_job(jobs, job_id, &job.event).await,
-        ForgeCommand::Status
-        | ForgeCommand::Cancel
-        | ForgeCommand::Improve
-        | ForgeCommand::Ask { .. }
-        | ForgeCommand::Fix => {
+        ForgeCommand::Status | ForgeCommand::Cancel | ForgeCommand::Improve | ForgeCommand::Fix => {
             jobs.update(job_id, |job| {
                 job.state = ForgeJobState::NeedsInput;
                 job.error =
                     Some("this Forge command is accepted but not implemented yet".to_string());
+            })
+            .await?;
+            Ok(())
+        }
+        ForgeCommand::Ask { .. } => {
+            jobs.update(job_id, |job| {
+                job.state = ForgeJobState::NeedsInput;
+                job.error = Some(
+                    "ask is currently available only for pull request review follow-up".to_string(),
+                );
             })
             .await?;
             Ok(())
@@ -93,7 +105,67 @@ async fn process_plan_job(
             return Ok(());
         }
     };
-    post_comment_if_configured(event, &render_plan_comment(&plan)).await?;
+    post_comment_if_configured(event, &render_plan_comment_with_feedback(&plan)).await?;
+    jobs.update(job_id, |job| {
+        job.state = ForgeJobState::WaitingForApproval;
+        job.branch_name = Some(plan.branch_name.clone());
+        job.plan = Some(plan);
+        job.error = None;
+    })
+    .await?;
+    Ok(())
+}
+
+async fn process_feedback_job(
+    jobs: &FileJobStore,
+    job_id: &str,
+    event: &ForgeGitHubEvent,
+    message: &str,
+) -> Result<(), ForgeError> {
+    let GitHubSubject::Issue { number, .. } = &event.subject else {
+        return Err(ForgeError::Config(
+            "/forge feedback requires an issue context".to_string(),
+        ));
+    };
+    let Some(plan_job) = jobs
+        .latest_waiting_issue_plan(&event.repository.full_name, *number)
+        .await?
+    else {
+        post_comment_if_configured(event, &render_feedback_missing_plan_comment()).await?;
+        jobs.update(job_id, |job| {
+            job.state = ForgeJobState::NeedsInput;
+            job.error = Some("no waiting issue plan found for feedback".to_string());
+        })
+        .await?;
+        return Ok(());
+    };
+
+    jobs.update(job_id, |job| job.state = ForgeJobState::Planning)
+        .await?;
+    post_comment_if_configured(event, &render_feedback_started_comment(message)).await?;
+
+    let revised_event = event_with_plan_feedback(event, message);
+    let plan = match run_e2b_plan_job(&revised_event).await {
+        Ok(plan) => plan,
+        Err(error) => {
+            tracing::warn!(%error, "E2B plan revision failed");
+            post_comment_if_configured(event, &render_feedback_failed_comment(&error.to_string()))
+                .await?;
+            jobs.update(job_id, |job| {
+                job.state = ForgeJobState::Failed;
+                job.error = Some(error.to_string());
+            })
+            .await?;
+            return Ok(());
+        }
+    };
+
+    post_comment_if_configured(event, &render_plan_comment_with_feedback(&plan)).await?;
+    jobs.update(&plan_job.id, |job| {
+        job.state = ForgeJobState::NeedsInput;
+        job.error = Some("plan superseded by maintainer feedback".to_string());
+    })
+    .await?;
     jobs.update(job_id, |job| {
         job.state = ForgeJobState::WaitingForApproval;
         job.branch_name = Some(plan.branch_name.clone());
@@ -145,7 +217,25 @@ async fn process_approve_job(
     })
     .await?;
 
-    let output = run_e2b_job(event, &branch, plan_job.plan.as_ref()).await?;
+    post_comment_if_configured(event, &render_approval_started_comment(&branch)).await?;
+    let output = match run_e2b_job(event, &branch, plan_job.plan.as_ref()).await {
+        Ok(output) => output,
+        Err(error) => {
+            post_comment_if_configured(event, &render_approval_failed_comment(&error.to_string()))
+                .await?;
+            jobs.update(job_id, |job| {
+                job.state = ForgeJobState::Failed;
+                job.error = Some(error.to_string());
+            })
+            .await?;
+            jobs.update(&plan_job.id, |job| {
+                job.state = ForgeJobState::WaitingForApproval;
+                job.error = Some("latest approval attempt failed".to_string());
+            })
+            .await?;
+            return Ok(());
+        }
+    };
     let pull_request = create_pull_request_for_output(event, &output).await?;
     let comment = render_branch_ready_comment(
         &output.branch_name,
@@ -413,7 +503,10 @@ async fn create_pull_request_for_output(
             .iter()
             .map(|check| {
                 let status = if check.passed { "passed" } else { "failed" };
-                format!("- `{}`: {} (exit {})", check.command, status, check.exit_code)
+                format!(
+                    "- `{}`: {} (exit {})",
+                    check.command, status, check.exit_code
+                )
             })
             .collect::<Vec<_>>()
             .join("\n"),
@@ -462,6 +555,21 @@ fn issue_branch_name(issue_number: u64) -> String {
 
 fn markdown_inline_code(value: &str) -> String {
     value.replace('`', "'")
+}
+
+fn event_with_plan_feedback(event: &ForgeGitHubEvent, feedback: &str) -> ForgeGitHubEvent {
+    let mut revised = event.clone();
+    revised.command = ForgeCommand::Plan;
+    if let GitHubSubject::Issue { body, .. } = &mut revised.subject {
+        let existing = body
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or("No issue body was provided.");
+        *body = Some(format!(
+            "{existing}\n\nMaintainer feedback for the revised Forge plan:\n{feedback}"
+        ));
+    }
+    revised
 }
 
 async fn post_comment_if_configured(
@@ -679,10 +787,16 @@ fn render_codebase_context(summary: &serde_json::Value) -> String {
         sections.push(format!("**Repository Shape**\n{structure}"));
     }
     if let Some(directories) = json_string_array(summary, "key_directories") {
-        sections.push(format!("**Important Areas**\n{}", markdown_list(&directories)));
+        sections.push(format!(
+            "**Important Areas**\n{}",
+            markdown_list(&directories)
+        ));
     }
     if let Some(patterns) = json_string_array(summary, "notable_patterns") {
-        sections.push(format!("**Conventions I Noticed**\n{}", markdown_list(&patterns)));
+        sections.push(format!(
+            "**Conventions I Noticed**\n{}",
+            markdown_list(&patterns)
+        ));
     }
     if let Some(skill) = json_string(summary, "skill_instructions") {
         sections.push(format!("**Repo Skill Guidance**\n{skill}"));
@@ -979,7 +1093,9 @@ mod tests {
         assert!(context.contains("Framework: Axum"));
         assert!(context.contains("**Important Areas**"));
         assert!(!context.contains("\"framework\""));
-        assert!(plan.proposed_change.contains("1. Read the affected handler."));
+        assert!(plan
+            .proposed_change
+            .contains("1. Read the affected handler."));
         assert!(!plan.proposed_change.contains("\\n"));
         assert_eq!(plan.checks, vec!["cargo test --workspace"]);
         assert!(plan.risk.contains("main"));
@@ -999,10 +1115,9 @@ mod tests {
             }),
         };
 
-        let error =
-            build_issue_plan_from_inspection(&issue_event(ForgeCommand::Plan), &inspection)
-                .unwrap_err()
-                .to_string();
+        let error = build_issue_plan_from_inspection(&issue_event(ForgeCommand::Plan), &inspection)
+            .unwrap_err()
+            .to_string();
 
         assert!(error.contains("API key expired"));
     }

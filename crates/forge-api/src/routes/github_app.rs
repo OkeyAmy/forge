@@ -427,6 +427,32 @@ mod tests {
     }
 
     #[test]
+    fn issue_comment_on_issue_accepts_feedback_command() {
+        let payload = json!({
+            "action": "created",
+            "repository": repo_json(),
+            "issue": issue_json(),
+            "comment": { "body": "/forge feedback use the README intro instead" },
+            "sender": { "login": "maintainer" }
+        });
+
+        let event = normalize_webhook_event(
+            "issue_comment",
+            "delivery-4",
+            serde_json::to_vec(&payload).unwrap().as_slice(),
+        )
+        .unwrap();
+
+        validate_command_context(&event).unwrap();
+        assert_eq!(
+            event.command,
+            ForgeCommand::Feedback {
+                message: "use the README intro instead".to_string()
+            }
+        );
+    }
+
+    #[test]
     fn hmac_signature_matches_github_header_format() {
         let signature = hmac_sha256_hex(b"secret", b"payload");
         assert_eq!(

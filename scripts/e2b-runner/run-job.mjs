@@ -342,51 +342,52 @@ try {
     console.log(JSON.stringify(output))
     process.exitCode = 0
   } else {
-  if (input.work_command) {
-    const command = [
-      `FORGE_ISSUE_FILE=${shellQuote(issuePath)}`,
-      `FORGE_ISSUE_NUMBER=${shellQuote(issue.number)}`,
-      input.work_command,
-    ].join(' ')
-    checks.push(await run(sandbox, command, repoDir))
-  } else {
-    checks.push(...(await runAutonomousEdit(sandbox, repoDir, issuePath, input)))
-  }
-
-  const diffBeforeChecks = await run(sandbox, 'git diff --name-only', repoDir)
-  const changedFiles = diffBeforeChecks.stdout
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-
-  for (const check of input.checks || []) {
-    checks.push(await run(sandbox, check, repoDir))
-  }
-
-  const risks = []
-  if (changedFiles.length === 0) {
-    risks.push('No code changes were produced in the E2B sandbox.')
-  }
-  for (const check of checks) {
-    if (!check.passed) {
-      risks.push(`Command failed: ${check.command}`)
+    const checks = []
+    if (input.work_command) {
+      const command = [
+        `FORGE_ISSUE_FILE=${shellQuote(issuePath)}`,
+        `FORGE_ISSUE_NUMBER=${shellQuote(issue.number)}`,
+        input.work_command,
+      ].join(' ')
+      checks.push(await run(sandbox, command, repoDir))
+    } else {
+      checks.push(...(await runAutonomousEdit(sandbox, repoDir, issuePath, input)))
     }
-  }
 
-  if (changedFiles.length > 0) {
-    await run(sandbox, 'git add -A', repoDir)
-    await run(sandbox, `git commit -m ${shellQuote(`Forge issue #${issue.number}`)}`, repoDir)
-    await run(sandbox, `git push origin HEAD:${shellQuote(branchName)}`, repoDir)
-  }
+    const diffBeforeChecks = await run(sandbox, 'git diff --name-only', repoDir)
+    const changedFiles = diffBeforeChecks.stdout
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
 
-  const output = {
-    branch_name: branchName,
-    compare_url: `https://github.com/${repo.owner}/${repo.name}/compare/${repo.default_branch}...${branchName}`,
-    changed_files: changedFiles,
-    checks: checks.map(({ command, exit_code, passed }) => ({ command, exit_code, passed })),
-    risks,
-  }
-  console.log(JSON.stringify(output))
+    for (const check of input.checks || []) {
+      checks.push(await run(sandbox, check, repoDir))
+    }
+
+    const risks = []
+    if (changedFiles.length === 0) {
+      risks.push('No code changes were produced in the E2B sandbox.')
+    }
+    for (const check of checks) {
+      if (!check.passed) {
+        risks.push(`Command failed: ${check.command}`)
+      }
+    }
+
+    if (changedFiles.length > 0) {
+      await run(sandbox, 'git add -A', repoDir)
+      await run(sandbox, `git commit -m ${shellQuote(`Forge issue #${issue.number}`)}`, repoDir)
+      await run(sandbox, `git push origin HEAD:${shellQuote(branchName)}`, repoDir)
+    }
+
+    const output = {
+      branch_name: branchName,
+      compare_url: `https://github.com/${repo.owner}/${repo.name}/compare/${repo.default_branch}...${branchName}`,
+      changed_files: changedFiles,
+      checks: checks.map(({ command, exit_code, passed }) => ({ command, exit_code, passed })),
+      risks,
+    }
+    console.log(JSON.stringify(output))
   }
 } catch (error) {
   console.error(error?.stack || String(error))

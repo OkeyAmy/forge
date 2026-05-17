@@ -1,4 +1,5 @@
 import { Cpu, Github } from "lucide-react";
+import { FORGE_REPO_URL, GITHUB_APP_INSTALL_URL } from "@/lib/links";
 
 export function Footer() {
   return (
@@ -12,26 +13,22 @@ export function Footer() {
 
         <div className="flex items-center gap-6 text-xs">
           <a
-            href="https://elizaos.com"
-            target="_blank"
-            rel="noopener noreferrer"
+            href={GITHUB_APP_INSTALL_URL}
             className="hover:text-white transition-colors"
           >
-            ElizaOS
+            Install App
           </a>
           <a
-            href="https://nosana.com"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="#setup"
             className="hover:text-white transition-colors"
           >
-            Nosana
+            Workflow
           </a>
         </div>
 
         <div className="flex items-center gap-4">
           <a
-            href="https://github.com/OkeyAmy/forge"
+            href={FORGE_REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 hover:text-white transition-colors"

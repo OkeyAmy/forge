@@ -17,8 +17,8 @@ const config: Config = {
         "code-bg": "#111827",
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "sans-serif"],
-        mono: ["var(--font-jetbrains)", "monospace"],
+        sans: ["Aptos", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["Berkeley Mono", "SFMono-Regular", "ui-monospace", "monospace"],
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",

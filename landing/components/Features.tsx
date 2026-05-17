@@ -1,38 +1,38 @@
 "use client";
 
-import { Box, Cpu, RefreshCw, FileText, Zap, GitBranch } from "lucide-react";
+import { Bot, GitBranch, GitPullRequestArrow, LockKeyhole, MessageSquareText, Workflow } from "lucide-react";
 import { useInView } from "@/hooks/useInView";
 
 const FEATURES = [
   {
-    icon: Box,
-    title: "Docker Sandbox",
-    description: "Every run is fully isolated — no leftover state, no host pollution.",
+    icon: Workflow,
+    title: "GitHub App Workflow",
+    description: "Users install Forge on repos and work entirely from GitHub issues and pull requests.",
   },
   {
-    icon: Cpu,
-    title: "Any OpenAI-compatible Model",
-    description: "Works with OpenAI, Gemini, Anthropic, Ollama, or any compatible endpoint.",
+    icon: LockKeyhole,
+    title: "E2B Execution",
+    description: "Repository inspection, implementation, and validation run in isolated E2B environments.",
   },
   {
-    icon: RefreshCw,
-    title: "Autonomous Agent Loop",
-    description: "Thinks, acts, observes, repeats until the task is done or the step limit is reached.",
+    icon: MessageSquareText,
+    title: "Approval-first Plans",
+    description: "Forge posts a readable engineering plan and waits for `/forge approve` before editing.",
   },
   {
-    icon: FileText,
-    title: "Full Trajectory Recording",
-    description: "Every step, command, and model response saved to a .traj file.",
-  },
-  {
-    icon: Zap,
-    title: "ElizaOS Integration",
-    description: "Drop-in action plugin for ElizaOS AI agents.",
+    icon: Bot,
+    title: "Pipeline Skills",
+    description: "Issue intake, inspection, planning, implementation, validation, review, and PR handoff are separate agent skills.",
   },
   {
     icon: GitBranch,
-    title: "Auto-fix on Label",
-    description: "Label any issue 'forge' — Forge picks it up, fixes it, and pushes branch forge/issue-{N} automatically. No commands to run.",
+    title: "Repo-level SKILL.md",
+    description: "Projects can teach Forge their setup, test commands, boundaries, and review rules.",
+  },
+  {
+    icon: GitPullRequestArrow,
+    title: "Pull Request Handoff",
+    description: "Forge pushes `forge/issue-{N}`, opens a PR, and reports checks, changed files, and risks.",
   },
 ];
 
@@ -51,7 +51,7 @@ export function Features() {
             does
           </h2>
           <p className="mt-4 text-muted max-w-xl mx-auto">
-            A complete autonomous engineering pipeline, from issue to branch.
+            The production system is built around GitHub, E2B, approval, and PR review.
           </p>
         </div>
 
@@ -69,7 +69,7 @@ export function Features() {
                   transform: inView ? "translateY(0)" : "translateY(24px)",
                   transition: `opacity 0.5s ease ${i * 0.08}s, transform 0.5s ease ${i * 0.08}s`,
                 }}
-                className="p-6 rounded-2xl border border-white/5 bg-white/[0.02] hover:border-accent-blue/30 hover:bg-white/[0.04] transition-all duration-300"
+                className="p-6 rounded-lg border border-white/5 bg-white/[0.02] hover:border-accent-blue/30 hover:bg-white/[0.04] transition-all duration-300"
               >
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent-blue/20 to-accent-purple/20 flex items-center justify-center mb-4">
                   <Icon className="w-5 h-5 text-accent-blue" />

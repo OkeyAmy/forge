@@ -5,14 +5,14 @@ import { TERMINAL_LINES } from "@/lib/terminal-lines";
 import { useInView } from "@/hooks/useInView";
 
 const STEPS = [
-  "Fetch the problem statement (GitHub issue, text, or file)",
-  "Start an isolated Docker sandbox",
-  "Clone the repository",
-  "Enter the agent loop — think, act, observe",
-  "Execute bash commands autonomously",
-  "Run submit to capture the git diff",
-  "Save the full trajectory to a .traj file",
-  "Push branch forge/issue-{N} — review and merge when ready",
+  "GitHub sends Forge the issue event",
+  "Forge starts an E2B sandbox for repository inspection",
+  "The planning pipeline reads code, config, and repo SKILL.md guidance",
+  "Forge posts a maintainer-readable plan in the issue thread",
+  "The user gives feedback or approves with /forge approve",
+  "The implementation pipeline edits, validates, and reviews the diff",
+  "Forge pushes forge/issue-{N} and opens a pull request",
+  "Maintainers review checks, risks, and the PR before merging",
 ];
 
 function TerminalAnimation() {
@@ -105,7 +105,7 @@ export function HowItWorks() {
             </span>
           </h2>
           <p className="mt-4 text-muted max-w-xl mx-auto">
-            Eight autonomous steps from issue to pull request, no human in the loop.
+            A GitHub-native pipeline with human approval before Forge changes code.
           </p>
         </div>
 

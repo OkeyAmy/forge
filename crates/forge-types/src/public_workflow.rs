@@ -9,6 +9,7 @@ pub enum ForgeCommand {
     Cancel,
     Review,
     Improve,
+    Feedback { message: String },
     Ask { question: String },
     Fix,
 }
@@ -31,6 +32,8 @@ impl ForgeCommand {
             "cancel" => Some(Self::Cancel),
             "review" => Some(Self::Review),
             "improve" => Some(Self::Improve),
+            "feedback" if !arg.is_empty() => Some(Self::Feedback { message: arg }),
+            "change" if !arg.is_empty() => Some(Self::Feedback { message: arg }),
             "ask" if !arg.is_empty() => Some(Self::Ask { question: arg }),
             "fix" => Some(Self::Fix),
             _ => None,
@@ -38,7 +41,7 @@ impl ForgeCommand {
     }
 
     pub fn requires_issue_context(&self) -> bool {
-        matches!(self, Self::Plan | Self::Approve)
+        matches!(self, Self::Plan | Self::Approve | Self::Feedback { .. })
     }
 
     pub fn requires_pr_context(&self) -> bool {
@@ -195,6 +198,62 @@ pub fn render_plan_comment(plan: &ForgePlan) -> String {
     )
 }
 
+pub fn render_plan_comment_with_feedback(plan: &ForgePlan) -> String {
+    let mut rendered = render_plan_comment(plan);
+    rendered.push_str(
+        "\n\n### Give Feedback\nComment `/forge feedback <what should change>` and Forge will revise the plan before implementation.",
+    );
+    rendered
+}
+
+pub fn render_approval_started_comment(branch_name: &str) -> String {
+    format!(
+        "## Forge Approved\n\n\
+         I found the approved plan and am starting a fresh E2B sandbox now.\n\n\
+         ### What Happens Next\n\
+         - Clone the repository with the GitHub App installation token.\n\
+         - Check out `{branch_name}` from the default branch.\n\
+         - Inspect the code and run the implementation pipeline.\n\
+         - Run the planned validation commands.\n\
+         - Push the branch and open a pull request if changes are produced.\n\n\
+         I will report back in this thread with the branch, PR, checks, and risks."
+    )
+}
+
+pub fn render_approval_failed_comment(error: &str) -> String {
+    format!(
+        "## Forge Implementation Failed\n\n\
+         I found the approved plan, but the E2B implementation job failed before a branch was ready.\n\n\
+         ### Error\n`{}`\n\n\
+         You can comment `/forge approve` again after the deployment or repository issue is fixed.",
+        error.replace('`', "'")
+    )
+}
+
+pub fn render_feedback_missing_plan_comment() -> String {
+    "## Forge\n\nI received the feedback, but I could not find a waiting plan for this issue. Run `/forge plan` first.".to_string()
+}
+
+pub fn render_feedback_started_comment(message: &str) -> String {
+    format!(
+        "## Forge Feedback Received\n\n\
+         I will revise the plan using this maintainer feedback before any code changes are made:\n\n\
+         > {}\n\n\
+         I am starting a fresh E2B inspection pass now.",
+        message.replace('\n', "\n> ")
+    )
+}
+
+pub fn render_feedback_failed_comment(error: &str) -> String {
+    format!(
+        "## Forge Plan Revision Failed\n\n\
+         I received the feedback, but could not revise the plan in E2B.\n\n\
+         ### Error\n`{}`\n\n\
+         Comment `/forge feedback <message>` again after the deployment or configuration issue is fixed.",
+        error.replace('`', "'")
+    )
+}
+
 pub fn render_branch_ready_comment(
     branch_name: &str,
     compare_url: &str,
@@ -242,7 +301,9 @@ pub fn render_branch_ready_comment(
 
     let next_step = pull_request_url
         .map(|url| format!("Forge opened a pull request: {url}"))
-        .unwrap_or_else(|| format!("Open a pull request from `{branch_name}` when the diff looks right."));
+        .unwrap_or_else(|| {
+            format!("Open a pull request from `{branch_name}` when the diff looks right.")
+        });
 
     format!(
         "## Forge Branch Ready\n\n\
@@ -270,6 +331,18 @@ mod tests {
         assert_eq!(
             ForgeCommand::parse("/forge approve"),
             Some(ForgeCommand::Approve)
+        );
+        assert_eq!(
+            ForgeCommand::parse("/forge feedback use the existing README section"),
+            Some(ForgeCommand::Feedback {
+                message: "use the existing README section".to_string()
+            })
+        );
+        assert_eq!(
+            ForgeCommand::parse("/forge change run npm build instead"),
+            Some(ForgeCommand::Feedback {
+                message: "run npm build instead".to_string()
+            })
         );
         assert_eq!(
             ForgeCommand::parse("/forge status"),
@@ -305,11 +378,16 @@ mod tests {
         assert_eq!(ForgeCommand::parse("forge plan"), None);
         assert_eq!(ForgeCommand::parse("/forge deploy"), None);
         assert_eq!(ForgeCommand::parse("/forge ask"), None);
+        assert_eq!(ForgeCommand::parse("/forge feedback"), None);
     }
 
     #[test]
     fn command_context_flags_are_stable() {
         assert!(ForgeCommand::Plan.requires_issue_context());
+        assert!(ForgeCommand::Feedback {
+            message: "revise plan".to_string()
+        }
+        .requires_issue_context());
         assert!(ForgeCommand::Review.requires_pr_context());
         assert!(!ForgeCommand::Status.requires_issue_context());
         assert!(!ForgeCommand::Cancel.requires_pr_context());

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Cpu } from "lucide-react";
+import { Cpu, Github } from "lucide-react";
+import { GITHUB_APP_INSTALL_URL } from "@/lib/links";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -30,18 +31,17 @@ export function Navbar() {
 
         <div className="flex items-center gap-4">
           <a
-            href="https://github.com/OkeyAmy/forge"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="#how-it-works"
             className="text-sm text-muted hover:text-white transition-colors"
           >
-            GitHub
+            Workflow
           </a>
           <a
-            href="#setup"
-            className="text-sm px-4 py-2 rounded-lg bg-gradient-to-r from-accent-blue to-accent-purple text-white font-medium hover:opacity-90 transition-opacity"
+            href={GITHUB_APP_INSTALL_URL}
+            className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-white/90"
           >
-            Get Started
+            <Github className="h-4 w-4" />
+            Install
           </a>
         </div>
       </div>
