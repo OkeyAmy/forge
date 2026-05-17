@@ -76,12 +76,21 @@ async fn process_plan_job(
     let plan = match run_e2b_plan_job(event).await {
         Ok(plan) => plan,
         Err(error) => {
-            tracing::warn!(%error, "E2B planning failed; falling back to issue-only plan");
-            let mut plan = build_issue_plan(event)?;
-            plan.codebase_context = Some(format!(
-                "Forge could not inspect the repository before planning: {error}. This fallback plan is based on the issue text only."
-            ));
-            plan
+            tracing::warn!(%error, "E2B planning failed");
+            post_comment_if_configured(
+                event,
+                &format!(
+                    "## Forge Planning Failed\n\nForge could not inspect this repository in E2B, so I did not create an approval plan.\n\n### Error\n`{}`\n\nRun `/forge plan` again after the deployment or configuration issue is fixed.",
+                    markdown_inline_code(&error.to_string())
+                ),
+            )
+            .await?;
+            jobs.update(job_id, |job| {
+                job.state = ForgeJobState::Failed;
+                job.error = Some(error.to_string());
+            })
+            .await?;
+            return Ok(());
         }
     };
     post_comment_if_configured(event, &render_plan_comment(&plan)).await?;
@@ -448,6 +457,10 @@ fn configured_checks() -> Vec<String> {
 
 fn issue_branch_name(issue_number: u64) -> String {
     format!("forge/issue-{issue_number}")
+}
+
+fn markdown_inline_code(value: &str) -> String {
+    value.replace('`', "'")
 }
 
 async fn post_comment_if_configured(
