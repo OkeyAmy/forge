@@ -738,7 +738,7 @@ fn json_string(value: &serde_json::Value, key: &str) -> Option<String> {
         .and_then(|value| value.as_str())
         .map(str::trim)
         .filter(|value| !value.is_empty() && !value.eq_ignore_ascii_case("null"))
-        .map(ToOwned::to_owned)
+        .map(humanize_model_text)
 }
 
 fn json_string_array(value: &serde_json::Value, key: &str) -> Option<Vec<String>> {
@@ -750,9 +750,13 @@ fn json_string_array(value: &serde_json::Value, key: &str) -> Option<Vec<String>
             .filter_map(|value| value.as_str())
             .map(str::trim)
             .filter(|value| !value.is_empty())
-            .map(ToOwned::to_owned)
+            .map(humanize_model_text)
             .collect(),
     )
+}
+
+fn humanize_model_text(value: &str) -> String {
+    value.replace("\\n", " ")
 }
 
 fn markdown_list(items: &[String]) -> String {
@@ -961,7 +965,7 @@ mod tests {
                     "key_directories": ["src: application code"],
                     "test_setup": "cargo test --workspace",
                     "recommended_checks": ["cargo test --workspace"],
-                    "implementation_plan": ["Read the affected handler.", "Patch the redirect logic."],
+                    "implementation_plan": ["Read the affected handler.", "Insert \\nnew content safely."],
                     "risk_level": "low",
                     "risk_notes": "Small isolated backend change."
                 }
@@ -976,6 +980,7 @@ mod tests {
         assert!(context.contains("**Important Areas**"));
         assert!(!context.contains("\"framework\""));
         assert!(plan.proposed_change.contains("1. Read the affected handler."));
+        assert!(!plan.proposed_change.contains("\\n"));
         assert_eq!(plan.checks, vec!["cargo test --workspace"]);
         assert!(plan.risk.contains("main"));
         assert_eq!(plan.branch_name, "forge/issue-9");

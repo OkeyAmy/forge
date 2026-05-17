@@ -183,7 +183,7 @@ pub fn render_plan_comment(plan: &ForgePlan) -> String {
          {context_section}\
          ### What I Think This Issue Needs\n{summary}\n\n\
          ### Proposed Change\n{proposed_change}\n\n\
-         ### Checks I Will Run\n{checks}\n\n\
+         ### Setup And Checks I Will Run\n{checks}\n\n\
          ### Risk\n{risk}\n\n\
          ### Branch\n`{branch_name}`\n\n\
          ### Approve\nComment `/forge approve` to let Forge make changes in an E2B sandbox.",
