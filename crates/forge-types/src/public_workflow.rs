@@ -223,9 +223,9 @@ pub fn render_approval_started_comment(branch_name: &str) -> String {
 pub fn render_approval_failed_comment(error: &str) -> String {
     format!(
         "## Forge Implementation Failed\n\n\
-         I found the approved plan, but the E2B implementation job failed before a branch was ready.\n\n\
+         I found the approved plan, but the E2B implementation job failed before a branch or pull request was ready.\n\n\
          ### Error\n`{}`\n\n\
-         You can comment `/forge approve` again after the deployment or repository issue is fixed.",
+         Forge stopped this run so the implementation problem can be fixed without repeating unsafe work.",
         error.replace('`', "'")
     )
 }

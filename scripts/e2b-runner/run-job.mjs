@@ -69,6 +69,31 @@ const run = async (sandbox, command, cwd = undefined) => {
   }
 }
 
+const runForObservation = async (sandbox, command, cwd = undefined) => {
+  const marker = '__FORGE_EXIT_CODE__'
+  const wrapped = [
+    'set +e',
+    command,
+    'status=$?',
+    `printf '\\n${marker}:%s\\n' "$status"`,
+    'exit 0',
+  ].join('\n')
+  const result = await retry(`model command ${command}`, () =>
+    sandbox.commands.run(wrapped, { cwd, timeoutMs, requestTimeoutMs }),
+  )
+  const rawStdout = String(result.stdout || '')
+  const match = rawStdout.match(new RegExp(`\\n${marker}:(\\d+)\\n?$`))
+  const exitCode = match ? Number(match[1]) : Number(result.exitCode ?? 0)
+  const stdout = match ? rawStdout.slice(0, match.index) : rawStdout
+  return {
+    command,
+    exit_code: exitCode,
+    passed: exitCode === 0,
+    stdout,
+    stderr: String(result.stderr || ''),
+  }
+}
+
 const callModel = async (modelConfig, messages) => {
   const baseUrl = String(modelConfig.base_url).replace(/\/$/, '')
   const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -236,6 +261,7 @@ const shouldSkipModelCommand = (command) => {
     /^git commit\b/,
     /^git push\b/,
     /^git remote\b/,
+    /^(pnpm|npm|yarn|bun) (add|install|i)\b/,
   ].some((pattern) => pattern.test(normalized))
 }
 
@@ -244,8 +270,8 @@ const skippedModelCommand = (command) => ({
   exit_code: 0,
   passed: true,
   stdout: [
-    'Forge skipped this command because branch, commit, remote, and push operations are managed by the runner.',
-    'Continue by inspecting files, editing the repository, and running validation commands.',
+    'Forge skipped this command because branch control, commits, pushes, remotes, and dependency installation are managed by the runner.',
+    'Continue by inspecting files, editing the repository, and running existing validation commands.',
   ].join('\n'),
   stderr: '',
 })
@@ -350,6 +376,7 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
         'Return strict JSON only: {"done": boolean, "commands": ["shell command"], "notes": "short reason"}.',
         'Use commands to inspect files, edit code, and run focused tests.',
         'Do not create, checkout, commit, push, or rename git branches. Forge already checked out the implementation branch and will commit, push, and open the PR after your edits.',
+        'Do not install new dependencies or package managers. Use the tools already present in the repository and sandbox.',
         'If the repository contains SKILL.md, .forge/SKILL.md, or .github/forge/SKILL.md, read it first and follow its repo-specific instructions.',
         'Do not print secrets or environment variables.',
         'Set done=true only after the repository has the intended code changes.',
@@ -391,7 +418,7 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
     for (const command of action.commands) {
       const result = shouldSkipModelCommand(command)
         ? skippedModelCommand(command)
-        : await run(sandbox, command, repoDir)
+        : await runForObservation(sandbox, command, repoDir)
       checks.push(result)
       observations.push([
         `$ ${command}`,
