@@ -94,6 +94,14 @@ const runForObservation = async (sandbox, command, cwd = undefined) => {
   }
 }
 
+const changedFilesInRepo = async (sandbox, repoDir) => {
+  const result = await run(sandbox, 'git diff --name-only', repoDir)
+  return result.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
 const callModel = async (modelConfig, messages) => {
   const baseUrl = String(modelConfig.base_url).replace(/\/$/, '')
   const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -379,7 +387,7 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
         'Do not install new dependencies or package managers. Use the tools already present in the repository and sandbox.',
         'If the repository contains SKILL.md, .forge/SKILL.md, or .github/forge/SKILL.md, read it first and follow its repo-specific instructions.',
         'Do not print secrets or environment variables.',
-        'Set done=true only after the repository has the intended code changes.',
+        'Set done=true after the repository has the intended code changes. Do not keep exploring once a focused diff exists.',
       ].join('\n'),
     },
     {
@@ -428,6 +436,22 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
       ].join('\n'))
     }
 
+    const changedFiles = await changedFilesInRepo(sandbox, repoDir)
+    if (changedFiles.length > 0) {
+      checks.push({
+        command: `forge-auto-finish-after-step-${step}`,
+        exit_code: 0,
+        passed: true,
+        stdout: [
+          'Forge detected repository changes and is moving to validation.',
+          '',
+          ...changedFiles.map((file) => `- ${file}`),
+        ].join('\n'),
+        stderr: '',
+      })
+      return checks
+    }
+
     messages.push({ role: 'assistant', content })
     messages.push({
       role: 'user',
@@ -435,9 +459,25 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
         `Observation for step ${step}:`,
         observations.join('\n\n---\n\n'),
         '',
-        'Continue with the next JSON action. If the fix is done, return done=true.',
+        'Continue with the next JSON action. If the fix is done or a focused diff exists, return done=true.',
       ].join('\n'),
     })
+  }
+
+  const changedFiles = await changedFilesInRepo(sandbox, repoDir)
+  if (changedFiles.length > 0) {
+    checks.push({
+      command: 'forge-auto-finish-at-max-steps',
+      exit_code: 0,
+      passed: true,
+      stdout: [
+        `Forge reached the ${maxSteps} step limit after producing repository changes, so it is moving to validation instead of failing the run.`,
+        '',
+        ...changedFiles.map((file) => `- ${file}`),
+      ].join('\n'),
+      stderr: '',
+    })
+    return checks
   }
 
   throw new Error(`model did not finish within ${maxSteps} E2B steps`)
