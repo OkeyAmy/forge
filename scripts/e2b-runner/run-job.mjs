@@ -126,7 +126,37 @@ const parseModelJson = (content) => {
   if (!candidate) {
     throw new Error('model response did not include a JSON object')
   }
-  return JSON.parse(candidate)
+  try {
+    return JSON.parse(candidate)
+  } catch (error) {
+    try {
+      return JSON.parse(escapeInvalidJsonEscapes(candidate))
+    } catch {
+      throw error
+    }
+  }
+}
+
+const escapeInvalidJsonEscapes = (value) => {
+  let output = ''
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i]
+    if (ch !== '\\') {
+      output += ch
+      continue
+    }
+    const next = value[i + 1]
+    if (!next) {
+      output += '\\\\'
+      continue
+    }
+    if ('"\\/bfnrtu'.includes(next)) {
+      output += ch
+    } else {
+      output += '\\\\'
+    }
+  }
+  return output
 }
 
 const callModelJson = async (modelConfig, messages, schemaDescription) => {
@@ -147,12 +177,24 @@ const callModelJson = async (modelConfig, messages, schemaDescription) => {
           'Expected JSON shape:',
           schemaDescription,
           '',
+          'Rules:',
+          '- Return one JSON object only.',
+          '- Put shell commands in string values.',
+          '- Escape backslashes as \\\\ inside JSON strings.',
+          '- Do not use markdown fences.',
+          '',
           'Malformed response:',
           truncate(content, 12000),
         ].join('\n'),
       },
     ])
-    return { parsed: parseModelJson(repaired), content: repaired }
+    try {
+      return { parsed: parseModelJson(repaired), content: repaired }
+    } catch (repairError) {
+      throw new Error(
+        `model returned invalid JSON after repair: ${repairError?.message || String(repairError)}; original parse error: ${error?.message || String(error)}`,
+      )
+    }
   }
 }
 
@@ -162,6 +204,27 @@ const modelActionFromJson = (parsed) => {
     commands: Array.isArray(parsed.commands) ? parsed.commands.map(String).filter(Boolean).slice(0, 5) : [],
     notes: String(parsed.notes || ''),
   }
+}
+
+const callActionJson = async (modelConfig, messages, schemaDescription, step) => {
+  let lastError
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await callModelJson(modelConfig, messages, schemaDescription)
+    } catch (error) {
+      lastError = error
+      messages.push({
+        role: 'user',
+        content: [
+          `Your previous action for step ${step} was not usable JSON: ${error?.message || String(error)}`,
+          'Return only this exact JSON shape:',
+          schemaDescription,
+          'Use valid JSON escaping. Backslashes inside shell commands must be doubled.',
+        ].join('\n'),
+      })
+    }
+  }
+  throw lastError
 }
 
 const runCodebaseExploration = async (sandbox, repoDir, input) => {
@@ -285,10 +348,11 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
 
   const checks = []
   for (let step = 1; step <= maxSteps; step += 1) {
-    const { parsed, content } = await callModelJson(
+    const { parsed, content } = await callActionJson(
       input.model,
       messages,
       '{"done": boolean, "commands": string[], "notes": string}',
+      step,
     )
     const action = modelActionFromJson(parsed)
     if (action.done) {

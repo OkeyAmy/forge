@@ -11,6 +11,15 @@ if [[ ! -f secrets/github-app.pem ]]; then
   exit 1
 fi
 
-docker compose --env-file .env.production -f docker-compose.prod.yml pull caddy
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
-docker compose --env-file .env.production -f docker-compose.prod.yml ps
+if docker compose version >/dev/null 2>&1; then
+  compose=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+  compose=(docker-compose)
+else
+  echo "Missing Docker Compose. Install docker-compose-plugin or docker-compose." >&2
+  exit 1
+fi
+
+"${compose[@]}" --env-file .env.production -f docker-compose.prod.yml pull caddy
+"${compose[@]}" --env-file .env.production -f docker-compose.prod.yml up -d --build
+"${compose[@]}" --env-file .env.production -f docker-compose.prod.yml ps
