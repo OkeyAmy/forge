@@ -15,6 +15,8 @@ Build real codebase context from files and commands inside E2B.
    package manager, build tool, and test setup.
 4. Detect generated directories and dependency folders that should not be edited.
 5. Prefer commands declared in project config over generic commands.
+6. Do not infer Rust, Python, Docker, or test tooling unless matching manifests
+   or config files exist.
 
 ## Output
 

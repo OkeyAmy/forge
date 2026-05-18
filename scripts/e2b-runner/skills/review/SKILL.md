@@ -13,7 +13,9 @@ merge it.
 2. Check for incorrect scope, broken contracts, missing validation, security
    issues, and maintainability risks.
 3. Confirm the implementation still matches the issue.
-4. Prefer concrete findings over generic advice.
+4. Reject placeholder tests, fake assertions, unrelated ecosystems, and invented
+   test infrastructure.
+5. Prefer concrete findings over generic advice.
 
 ## Output
 

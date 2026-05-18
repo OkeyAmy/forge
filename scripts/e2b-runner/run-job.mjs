@@ -102,6 +102,15 @@ const changedFilesInRepo = async (sandbox, repoDir) => {
     .filter(Boolean)
 }
 
+const repoHasAny = async (sandbox, repoDir, files) => {
+  const expression = files.map((file) => `[ -f ${shellQuote(file)} ]`).join(' || ')
+  const result = await runForObservation(sandbox, expression || 'false', repoDir)
+  return result.exit_code === 0
+}
+
+const repoUsesPython = async (sandbox, repoDir) =>
+  repoHasAny(sandbox, repoDir, ['pyproject.toml', 'requirements.txt', 'setup.py', 'setup.cfg'])
+
 const commandProgram = (command) => {
   const match = String(command || '').trim().match(/^([A-Za-z0-9._/-]+)/)
   return match ? match[1] : ''
@@ -141,7 +150,7 @@ const validationCheckSkipReason = async (sandbox, command, repoDir) => {
 const skippedValidationCheck = (command, reason) => ({
   command,
   exit_code: 0,
-  passed: true,
+  passed: false,
   stdout: `Forge skipped this validation command: ${reason}.`,
   stderr: '',
   skipped: true,
@@ -316,6 +325,8 @@ const shouldSkipModelCommand = (command) => {
     /^git push\b/,
     /^git remote\b/,
     /^(pnpm|npm|yarn|bun) (add|install|i)\b/,
+    /^(python|python3) -m pip (install|uninstall)\b/,
+    /^pip(3)? (install|uninstall)\b/,
   ].some((pattern) => pattern.test(normalized))
 }
 
@@ -329,6 +340,61 @@ const skippedModelCommand = (command) => ({
   ].join('\n'),
   stderr: '',
 })
+
+const runQualityGate = async (sandbox, repoDir, changedFiles) => {
+  const blockers = []
+  const changed = new Set(changedFiles)
+  const pythonProject = await repoUsesPython(sandbox, repoDir)
+
+  const placeholderPattern = [
+    'expect(true).toBe(true)',
+    'assert True',
+    'placeholder test',
+    'Replace with actual',
+  ].map((value) => `-e ${shellQuote(value)}`).join(' ')
+  const placeholderResult = await runForObservation(
+    sandbox,
+    `git diff -- ${changedFiles.map(shellQuote).join(' ')} | grep -F -n ${placeholderPattern}`,
+    repoDir,
+  )
+  if (placeholderResult.exit_code === 0) {
+    blockers.push(`placeholder or fake test content detected:\n${truncate(placeholderResult.stdout, 2000)}`)
+  }
+
+  if (!pythonProject) {
+    const pythonTestFiles = changedFiles.filter((file) =>
+      /(^|\/)(__tests__|tests?)\/.*\.py$/.test(file) || /(^|\/)test_.*\.py$/.test(file),
+    )
+    if (pythonTestFiles.length > 0) {
+      blockers.push(`Python test files were added to a repository without a Python project manifest: ${pythonTestFiles.join(', ')}`)
+    }
+  }
+
+  const addedTestInfra = [
+    'vitest.config.ts',
+    'vitest.config.js',
+    'vitest.setup.ts',
+    'vitest.setup.js',
+  ].filter((file) => changed.has(file))
+  if (addedTestInfra.length > 0) {
+    const packageJson = await runForObservation(sandbox, 'git show HEAD:package.json 2>/dev/null || cat package.json 2>/dev/null || true', repoDir)
+    const packageText = packageJson.stdout
+    const alreadyUsedVitest = /"vitest"\s*:/.test(packageText) || /"test"\s*:\s*"[^"]*vitest/.test(packageText)
+    if (!alreadyUsedVitest) {
+      blockers.push(`new Vitest infrastructure was added without an existing Vitest setup: ${addedTestInfra.join(', ')}`)
+    }
+  }
+
+  if (blockers.length > 0) {
+    throw new Error([
+      'Forge quality gate rejected this implementation before commit/push.',
+      '',
+      ...blockers.map((blocker) => `- ${blocker}`),
+      '',
+      'The agent must inspect the repository and implement the actual issue. Placeholder tests, unrelated ecosystems, and invented test infrastructure are not acceptable.',
+    ].join('\n'))
+  }
+}
 
 const runCodebaseExploration = async (sandbox, repoDir, input) => {
   // Exploration commands that run inside the sandbox to understand the codebase
@@ -360,7 +426,9 @@ const runCodebaseExploration = async (sandbox, repoDir, input) => {
   if (input.model) {
     const planningSkills = workflowSkillPack(['issue-intake', 'repository-inspection', 'planning', 'validation', 'github-communication'])
     const summaryPrompt = [
-      'You are Forge planning a real GitHub issue workflow. Use the workflow skills and repository exploration to produce a maintainer-readable engineering plan.',
+      'You are Forge planning a real GitHub issue workflow. You behave like a senior full-time software engineer joining an unfamiliar codebase.',
+      'Reason only from the repository structure and issue text. Do not assume Docker, Rust, Python, or test tooling unless the repository proves it.',
+      'Use the workflow skills and repository exploration to produce a maintainer-readable engineering plan.',
       '',
       `Repository: ${input.repository.owner}/${input.repository.name}`,
       `Default branch: ${input.repository.default_branch}`,
@@ -421,16 +489,23 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
       role: 'system',
       content: [
         'You are Forge running inside an E2B sandbox.',
-        'You are not a generic coding chatbot. You are executing a professional software engineering pipeline.',
+        'You are a senior full-time software engineer operating inside a cloud sandbox. You are not a generic coding chatbot, command runner, test generator, or Docker-era pipeline executor.',
+        'Your decisions must come from the cloned repository. Inspect package manifests, lockfiles, framework configs, README, source files, existing tests, and scripts before editing.',
         'Follow the Forge workflow skills below for how to inspect, implement, validate, review, and prepare a PR.',
         '',
         implementationSkills,
         '',
         'You may inspect and edit the cloned repository only through shell commands.',
         'Return strict JSON only: {"done": boolean, "commands": ["shell command"], "notes": "short reason"}.',
-        'Use commands to inspect files, edit code, and run focused tests.',
+        'Use commands to inspect files, read relevant source, edit code, and run focused validation that fits this repository.',
         'Do not create, checkout, commit, push, or rename git branches. Forge already checked out the implementation branch and will commit, push, and open the PR after your edits.',
-        'Do not install new dependencies or package managers. Use the tools already present in the repository and sandbox.',
+        'Do not install new dependencies, package managers, or test frameworks unless the issue explicitly requires it and the repository has no suitable existing path.',
+        'Do not add placeholder work. Never create tests containing expect(true).toBe(true), assert True, "placeholder test", or equivalent fake coverage.',
+        'Do not create Python files, Python tests, or install Python packages unless the repository is actually Python-based or the issue explicitly requires Python.',
+        'Do not add Vitest, Jest, Playwright, pytest, or any test infrastructure unless it matches the existing project architecture and is necessary for the issue.',
+        'For JavaScript or TypeScript projects, use the package manager implied by the lockfile and scripts declared in package.json.',
+        'For Rust, Python, Docker, or other ecosystems, use those tools only when matching manifests/config files exist.',
+        'If the issue asks for a README or documentation change, make that documentation change directly and do not invent tests or dependencies.',
         'If the repository contains SKILL.md, .forge/SKILL.md, or .github/forge/SKILL.md, read it first and follow its repo-specific instructions.',
         'Do not print secrets or environment variables.',
         'Set done=true after the repository has the intended code changes. Do not keep exploring once a focused diff exists.',
@@ -446,7 +521,7 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
         '',
         input.issue.body || 'No issue body was provided.',
         '',
-        'Start by inspecting the repository and any Forge SKILL.md file, then make the smallest useful change.',
+        'Start by inspecting the repository and any Forge SKILL.md file. Identify the actual stack and relevant files before editing, then make the smallest correct change.',
       ].join('\n'),
     },
   ]
@@ -601,12 +676,13 @@ try {
       risks.push('No code changes were produced in the E2B sandbox.')
     }
     for (const check of checks) {
-      if (!check.passed) {
+      if (!check.passed && !check.skipped) {
         risks.push(`Command failed: ${check.command}`)
       }
     }
 
     if (changedFiles.length > 0) {
+      await runQualityGate(sandbox, repoDir, changedFiles)
       await run(sandbox, 'git add -A', repoDir)
       await run(sandbox, `git commit -m ${shellQuote(`Forge issue #${issue.number}`)}`, repoDir)
       await run(sandbox, `git push origin HEAD:${shellQuote(branchName)}`, repoDir)
@@ -616,7 +692,7 @@ try {
       branch_name: branchName,
       compare_url: `https://github.com/${repo.owner}/${repo.name}/compare/${repo.default_branch}...${branchName}`,
       changed_files: changedFiles,
-      checks: checks.map(({ command, exit_code, passed }) => ({ command, exit_code, passed })),
+      checks: checks.map(({ command, exit_code, passed, skipped, skip_reason }) => ({ command, exit_code, passed, skipped, skip_reason })),
       risks,
     }
     console.log(JSON.stringify(output))

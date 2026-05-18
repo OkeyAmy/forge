@@ -502,11 +502,19 @@ async fn create_pull_request_for_output(
             .checks
             .iter()
             .map(|check| {
-                let status = if check.passed { "passed" } else { "failed" };
-                format!(
-                    "- `{}`: {} (exit {})",
-                    check.command, status, check.exit_code
-                )
+                if check.skipped.unwrap_or(false) {
+                    let reason = check
+                        .skip_reason
+                        .as_deref()
+                        .unwrap_or("no skip reason provided");
+                    format!("- `{}`: skipped ({reason})", check.command)
+                } else {
+                    let status = if check.passed { "passed" } else { "failed" };
+                    format!(
+                        "- `{}`: {} (exit {})",
+                        check.command, status, check.exit_code
+                    )
+                }
             })
             .collect::<Vec<_>>()
             .join("\n"),
@@ -655,6 +663,8 @@ pub struct E2bCheckOutput {
     pub command: String,
     pub exit_code: i32,
     pub passed: bool,
+    pub skipped: Option<bool>,
+    pub skip_reason: Option<String>,
 }
 
 async fn run_e2b_plan_job(event: &ForgeGitHubEvent) -> Result<ForgePlan, ForgeError> {
@@ -1276,6 +1286,22 @@ mod tests {
         assert_eq!(output.changed_files, vec!["src/lib.rs"]);
         assert_eq!(output.checks[0].command, "cargo test");
         assert!(output.checks[0].passed);
+    }
+
+    #[test]
+    fn e2b_runner_output_preserves_skipped_validation_checks() {
+        let output = parse_e2b_runner_output(
+            "log line\n{\"branch_name\":\"forge/issue-38\",\"compare_url\":\"https://github.com/acme/web/compare/main...forge/issue-38\",\"changed_files\":[\"package.json\"],\"checks\":[{\"command\":\"cargo test --workspace\",\"exit_code\":0,\"passed\":false,\"skipped\":true,\"skip_reason\":\"Rust Cargo manifest was not found in the repository\"}],\"risks\":[\"Skipped validation command `cargo test --workspace`: Rust Cargo manifest was not found in the repository.\"]}\n",
+        )
+        .unwrap();
+
+        assert_eq!(output.checks[0].command, "cargo test --workspace");
+        assert!(!output.checks[0].passed);
+        assert_eq!(output.checks[0].skipped, Some(true));
+        assert_eq!(
+            output.checks[0].skip_reason.as_deref(),
+            Some("Rust Cargo manifest was not found in the repository")
+        );
     }
 
     #[tokio::test]
