@@ -13,13 +13,18 @@ fi
 
 if docker compose version >/dev/null 2>&1; then
   compose=(docker compose)
+  legacy_compose=false
 elif command -v docker-compose >/dev/null 2>&1; then
   compose=(docker-compose)
+  legacy_compose=true
 else
   echo "Missing Docker Compose. Install docker-compose-plugin or docker-compose." >&2
   exit 1
 fi
 
 "${compose[@]}" --env-file .env.production -f docker-compose.prod.yml pull caddy
+if [[ "$legacy_compose" == "true" ]]; then
+  "${compose[@]}" --env-file .env.production -f docker-compose.prod.yml down
+fi
 "${compose[@]}" --env-file .env.production -f docker-compose.prod.yml up -d --build
 "${compose[@]}" --env-file .env.production -f docker-compose.prod.yml ps
