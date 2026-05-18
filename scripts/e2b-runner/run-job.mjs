@@ -227,6 +227,29 @@ const callActionJson = async (modelConfig, messages, schemaDescription, step) =>
   throw lastError
 }
 
+const shouldSkipModelCommand = (command) => {
+  const normalized = String(command || '').trim().replace(/\s+/g, ' ')
+  return [
+    /^git checkout (-b|-B)\b/,
+    /^git switch (-c|-C)\b/,
+    /^git branch\b/,
+    /^git commit\b/,
+    /^git push\b/,
+    /^git remote\b/,
+  ].some((pattern) => pattern.test(normalized))
+}
+
+const skippedModelCommand = (command) => ({
+  command,
+  exit_code: 0,
+  passed: true,
+  stdout: [
+    'Forge skipped this command because branch, commit, remote, and push operations are managed by the runner.',
+    'Continue by inspecting files, editing the repository, and running validation commands.',
+  ].join('\n'),
+  stderr: '',
+})
+
 const runCodebaseExploration = async (sandbox, repoDir, input) => {
   // Exploration commands that run inside the sandbox to understand the codebase
   const explorationCommands = [
@@ -326,6 +349,7 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
         'You may inspect and edit the cloned repository only through shell commands.',
         'Return strict JSON only: {"done": boolean, "commands": ["shell command"], "notes": "short reason"}.',
         'Use commands to inspect files, edit code, and run focused tests.',
+        'Do not create, checkout, commit, push, or rename git branches. Forge already checked out the implementation branch and will commit, push, and open the PR after your edits.',
         'If the repository contains SKILL.md, .forge/SKILL.md, or .github/forge/SKILL.md, read it first and follow its repo-specific instructions.',
         'Do not print secrets or environment variables.',
         'Set done=true only after the repository has the intended code changes.',
@@ -365,7 +389,9 @@ const runAutonomousEdit = async (sandbox, repoDir, issuePath, input) => {
 
     const observations = []
     for (const command of action.commands) {
-      const result = await run(sandbox, command, repoDir)
+      const result = shouldSkipModelCommand(command)
+        ? skippedModelCommand(command)
+        : await run(sandbox, command, repoDir)
       checks.push(result)
       observations.push([
         `$ ${command}`,
