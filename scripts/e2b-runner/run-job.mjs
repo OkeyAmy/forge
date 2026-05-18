@@ -102,6 +102,52 @@ const changedFilesInRepo = async (sandbox, repoDir) => {
     .filter(Boolean)
 }
 
+const commandProgram = (command) => {
+  const match = String(command || '').trim().match(/^([A-Za-z0-9._/-]+)/)
+  return match ? match[1] : ''
+}
+
+const validationCheckSkipReason = async (sandbox, command, repoDir) => {
+  const program = commandProgram(command)
+  if (!program) return 'empty validation command'
+
+  const manifestChecks = [
+    { pattern: /^cargo\b/, manifest: 'Cargo.toml', label: 'Rust Cargo manifest' },
+    { pattern: /^pnpm\b/, manifest: 'package.json', label: 'Node package manifest' },
+    { pattern: /^npm\b/, manifest: 'package.json', label: 'Node package manifest' },
+    { pattern: /^yarn\b/, manifest: 'package.json', label: 'Node package manifest' },
+    { pattern: /^bun\b/, manifest: 'package.json', label: 'Node package manifest' },
+    { pattern: /^python\b|^python3\b|^pytest\b|^pip\b/, manifest: 'pyproject.toml requirements.txt setup.py', label: 'Python project manifest' },
+  ]
+  for (const check of manifestChecks) {
+    if (!check.pattern.test(command)) continue
+    const expression = check.manifest
+      .split(' ')
+      .map((file) => `[ -f ${shellQuote(file)} ]`)
+      .join(' || ')
+    const result = await runForObservation(sandbox, expression, repoDir)
+    if (result.exit_code !== 0) {
+      return `${check.label} was not found in the repository`
+    }
+  }
+
+  const binaryCheck = await runForObservation(sandbox, `command -v ${shellQuote(program)}`, repoDir)
+  if (binaryCheck.exit_code !== 0) {
+    return `${program} is not installed in the E2B template`
+  }
+  return ''
+}
+
+const skippedValidationCheck = (command, reason) => ({
+  command,
+  exit_code: 0,
+  passed: true,
+  stdout: `Forge skipped this validation command: ${reason}.`,
+  stderr: '',
+  skipped: true,
+  skip_reason: reason,
+})
+
 const callModel = async (modelConfig, messages) => {
   const baseUrl = String(modelConfig.base_url).replace(/\/$/, '')
   const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -540,11 +586,17 @@ try {
       .map((line) => line.trim())
       .filter(Boolean)
 
+    const risks = []
     for (const check of input.checks || []) {
-      checks.push(await run(sandbox, check, repoDir))
+      const skipReason = await validationCheckSkipReason(sandbox, check, repoDir)
+      if (skipReason) {
+        checks.push(skippedValidationCheck(check, skipReason))
+        risks.push(`Skipped validation command \`${check}\`: ${skipReason}.`)
+      } else {
+        checks.push(await runForObservation(sandbox, check, repoDir))
+      }
     }
 
-    const risks = []
     if (changedFiles.length === 0) {
       risks.push('No code changes were produced in the E2B sandbox.')
     }

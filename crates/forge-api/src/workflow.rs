@@ -2,11 +2,11 @@ use std::process::Stdio;
 
 use forge_run::run_single::build_model;
 use forge_types::public_workflow::{
-    render_approval_failed_comment, render_approval_started_comment, render_branch_ready_comment,
-    render_feedback_failed_comment, render_feedback_missing_plan_comment,
-    render_feedback_started_comment, render_plan_comment_with_feedback, ForgeCheckResult,
-    ForgeCommand, ForgeGitHubEvent, ForgeJobState, ForgePlan, ForgeVerificationSummary,
-    GitHubSubject,
+    ForgeCheckResult, ForgeCommand, ForgeGitHubEvent, ForgeJobState, ForgePlan,
+    ForgeVerificationSummary, GitHubSubject, render_approval_failed_comment,
+    render_approval_started_comment, render_branch_ready_comment, render_feedback_failed_comment,
+    render_feedback_missing_plan_comment, render_feedback_started_comment,
+    render_plan_comment_with_feedback,
 };
 use forge_types::{ForgeError, HistoryItem, MessageContent, Role};
 use tokio::sync::mpsc;
@@ -828,11 +828,62 @@ fn render_proposed_change(summary: &serde_json::Value, repository: &str) -> Stri
 
 fn recommended_checks(summary: &serde_json::Value) -> Vec<String> {
     let model_checks = json_string_array(summary, "recommended_checks").unwrap_or_default();
-    if model_checks.is_empty() {
+    let checks = if model_checks.is_empty() {
         configured_checks()
     } else {
         model_checks
+    };
+    checks
+        .into_iter()
+        .filter(|check| check_matches_summary(check, summary))
+        .collect()
+}
+
+fn check_matches_summary(check: &str, summary: &serde_json::Value) -> bool {
+    let command = check.trim().to_ascii_lowercase();
+    let context = [
+        json_string(summary, "language"),
+        json_string(summary, "framework"),
+        json_string(summary, "build_system"),
+        json_string(summary, "test_setup"),
+        json_string(summary, "structure_summary"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>()
+    .join(" ")
+    .to_ascii_lowercase();
+
+    if command.starts_with("cargo ") || command == "cargo" {
+        return context.contains("rust") || context.contains("cargo");
     }
+    if command.starts_with("npm ")
+        || command.starts_with("pnpm ")
+        || command.starts_with("yarn ")
+        || command.starts_with("bun ")
+    {
+        return context.contains("javascript")
+            || context.contains("typescript")
+            || context.contains("node")
+            || context.contains("react")
+            || context.contains("vite")
+            || context.contains("package.json")
+            || context.contains("npm")
+            || context.contains("pnpm")
+            || context.contains("yarn")
+            || context.contains("bun");
+    }
+    if command.starts_with("python ")
+        || command.starts_with("python3 ")
+        || command.starts_with("pytest ")
+        || command == "pytest"
+    {
+        return context.contains("python")
+            || context.contains("pyproject.toml")
+            || context.contains("requirements.txt")
+            || context.contains("pytest");
+    }
+    true
 }
 
 fn render_plan_risk(summary: &serde_json::Value, repository: &str, branch: &str) -> String {
@@ -1093,13 +1144,41 @@ mod tests {
         assert!(context.contains("Framework: Axum"));
         assert!(context.contains("**Important Areas**"));
         assert!(!context.contains("\"framework\""));
-        assert!(plan
-            .proposed_change
-            .contains("1. Read the affected handler."));
+        assert!(
+            plan.proposed_change
+                .contains("1. Read the affected handler.")
+        );
         assert!(!plan.proposed_change.contains("\\n"));
         assert_eq!(plan.checks, vec!["cargo test --workspace"]);
         assert!(plan.risk.contains("main"));
         assert_eq!(plan.branch_name, "forge/issue-9");
+    }
+
+    #[test]
+    fn codebase_inspection_drops_incompatible_recommended_checks() {
+        let inspection = E2bPlanRunnerOutput {
+            mode: "exploration".to_string(),
+            repository: "acme/web".to_string(),
+            branch: "main".to_string(),
+            exploration: serde_json::json!({
+                "synthesized_summary": {
+                    "language": "TypeScript",
+                    "framework": "React with Vite",
+                    "structure_summary": "Frontend application with package.json scripts.",
+                    "build_system": "Vite",
+                    "test_setup": "npm test",
+                    "recommended_checks": ["cargo test --workspace", "npm test"],
+                    "implementation_plan": ["Update the affected component."],
+                    "risk_level": "low",
+                    "risk_notes": "Small frontend change."
+                }
+            }),
+        };
+
+        let plan = build_issue_plan_from_inspection(&issue_event(ForgeCommand::Plan), &inspection)
+            .unwrap();
+
+        assert_eq!(plan.checks, vec!["npm test"]);
     }
 
     #[test]
