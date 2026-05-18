@@ -195,21 +195,84 @@ fn normalize_issue_comment_event(
         ));
     }
 
-    let command = ForgeCommand::parse(&payload.comment.body).ok_or_else(|| {
-        (
+    if payload.sender.is_bot() {
+        return Err((
             StatusCode::BAD_REQUEST,
-            "comment does not contain a supported Forge command".to_string(),
-        )
-    })?;
+            "Forge ignores bot issue comments".to_string(),
+        ));
+    }
+
+    let subject = payload.issue.into_subject();
+    let command =
+        parse_issue_comment_command(&payload.comment.body, &subject).ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "comment does not contain a supported Forge command".to_string(),
+            )
+        })?;
 
     Ok(ForgeGitHubEvent {
         delivery_id: delivery_id.to_string(),
         installation_id: payload.installation.map(|installation| installation.id),
         repository: payload.repository.into(),
         actor: payload.sender.into(),
-        subject: payload.issue.into_subject(),
+        subject,
         command,
     })
+}
+
+fn parse_issue_comment_command(body: &str, subject: &GitHubSubject) -> Option<ForgeCommand> {
+    if let Some(command) = ForgeCommand::parse(body) {
+        return Some(command);
+    }
+
+    match subject {
+        GitHubSubject::Issue { .. } => parse_issue_feedback_mention(body),
+        GitHubSubject::PullRequest { .. } => None,
+    }
+}
+
+fn parse_issue_feedback_mention(body: &str) -> Option<ForgeCommand> {
+    let trimmed = body.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    for plan_prefix in ["forge", "@forge", "@meizenai", "meizenai"] {
+        if trimmed.eq_ignore_ascii_case(plan_prefix) {
+            return Some(ForgeCommand::Plan);
+        }
+    }
+
+    for prefix in ["/forge", "forge", "@forge", "@meizenai", "meizenai"] {
+        if let Some(rest) = strip_word_prefix(trimmed, prefix) {
+            let feedback = rest.trim();
+            if !feedback.is_empty() {
+                return Some(ForgeCommand::Feedback {
+                    message: feedback.to_string(),
+                });
+            }
+        }
+    }
+
+    None
+}
+
+fn strip_word_prefix<'a>(value: &'a str, prefix: &str) -> Option<&'a str> {
+    let head = value.get(..prefix.len())?;
+    if !head.eq_ignore_ascii_case(prefix) {
+        return None;
+    }
+
+    let rest = value.get(prefix.len()..)?;
+    match rest.chars().next() {
+        Some(ch) if ch.is_whitespace() || ch == ':' || ch == ',' => Some(
+            rest.trim_start()
+                .trim_start_matches([':', ','])
+                .trim_start(),
+        ),
+        _ => None,
+    }
 }
 
 fn validate_command_context(event: &ForgeGitHubEvent) -> Result<(), (StatusCode, String)> {
@@ -314,6 +377,17 @@ struct GitHubCommentPayload {
 #[derive(Debug, Deserialize)]
 struct GitHubUserPayload {
     login: String,
+    #[serde(rename = "type")]
+    kind: Option<String>,
+}
+
+impl GitHubUserPayload {
+    fn is_bot(&self) -> bool {
+        self.kind
+            .as_deref()
+            .is_some_and(|kind| kind.eq_ignore_ascii_case("Bot"))
+            || self.login.ends_with("[bot]")
+    }
 }
 
 impl From<GitHubUserPayload> for GitHubActor {
@@ -450,6 +524,79 @@ mod tests {
                 message: "use the README intro instead".to_string()
             }
         );
+    }
+
+    #[test]
+    fn issue_comment_on_issue_accepts_forge_prefixed_feedback() {
+        let payload = json!({
+            "action": "created",
+            "repository": repo_json(),
+            "issue": issue_json(),
+            "comment": { "body": "forge please keep the README change minimal" },
+            "sender": { "login": "maintainer", "type": "User" }
+        });
+
+        let event = normalize_webhook_event(
+            "issue_comment",
+            "delivery-5",
+            serde_json::to_vec(&payload).unwrap().as_slice(),
+        )
+        .unwrap();
+
+        validate_command_context(&event).unwrap();
+        assert_eq!(
+            event.command,
+            ForgeCommand::Feedback {
+                message: "please keep the README change minimal".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn issue_comment_on_issue_accepts_app_mention_feedback() {
+        let payload = json!({
+            "action": "created",
+            "repository": repo_json(),
+            "issue": issue_json(),
+            "comment": { "body": "@meizenai: revise the plan before coding" },
+            "sender": { "login": "maintainer", "type": "User" }
+        });
+
+        let event = normalize_webhook_event(
+            "issue_comment",
+            "delivery-6",
+            serde_json::to_vec(&payload).unwrap().as_slice(),
+        )
+        .unwrap();
+
+        validate_command_context(&event).unwrap();
+        assert_eq!(
+            event.command,
+            ForgeCommand::Feedback {
+                message: "revise the plan before coding".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn issue_comment_ignores_bot_sender() {
+        let payload = json!({
+            "action": "created",
+            "repository": repo_json(),
+            "issue": issue_json(),
+            "comment": { "body": "@meizenai revise this plan" },
+            "sender": { "login": "meizenai[bot]", "type": "Bot" }
+        });
+
+        let error = normalize_webhook_event(
+            "issue_comment",
+            "delivery-7",
+            serde_json::to_vec(&payload).unwrap().as_slice(),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.0, StatusCode::BAD_REQUEST);
+        assert_eq!(error.1, "Forge ignores bot issue comments");
     }
 
     #[test]
